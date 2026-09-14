@@ -154,6 +154,10 @@ function nav(lang: 'es' | 'en'): DefaultTheme.NavItem[] {
 export default defineConfig({
     base: '/docs/',
     cleanUrls: true,
+    // Estricto por omisión: en la CI un enlace roto hace fallar el build. Con
+    // DOCS_ALLOW_DEAD_LINKS=1 se puede comprobar en local el resto de errores
+    // mientras hay secciones a medio escribir.
+    ignoreDeadLinks: process.env.DOCS_ALLOW_DEAD_LINKS === '1',
     lastUpdated: true,
     title: 'innoboxrr',
 
