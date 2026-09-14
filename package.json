@@ -1,0 +1,18 @@
+{
+    "name": "innoboxrr-docs",
+    "private": true,
+    "type": "module",
+    "description": "Documentación del ecosistema innoboxrr: LaraPack, la aplicación base con Vue o React, los paquetes de Laravel y npm, y el desarrollo con IA.",
+    "scripts": {
+        "docs:dev": "vitepress dev",
+        "docs:build": "vitepress build",
+        "docs:preview": "vitepress preview"
+    },
+    "devDependencies": {
+        "vitepress": "^1.6.4",
+        "vue": "^3.5.0"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}
