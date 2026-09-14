@@ -22,6 +22,7 @@ Mira la versión instalada con `composer show innoboxrr/larapack-generator` y bu
 | 7.9 | Bajo | El proveedor de eventos se regenera | [7.9 → 7.10](#de-79-a-710) y siguientes |
 | 7.10.0 | Nada en un paquete; bajo en una aplicación | En una aplicación, factories y tests a regenerar | [7.10.0 → 7.10.1](#de-7100-a-7101) y siguientes |
 | 7.10.1 | Nada en un paquete; bajo en una aplicación | En una aplicación, la exportación y su notificación a regenerar | [7.10.1 → 7.10.2](#de-7101-a-7102) y siguientes |
+| 7.10.2 | Bajo | La salida de `--format=json` y el contrato del modelo sin `_token` por GET | [7.10.2 → 7.10.3](#de-7102-a-7103) |
 
 ## El procedimiento, sea cual sea la versión
 
@@ -349,3 +350,11 @@ No cambia el contrato. En un paquete no hay nada que hacer: lo generado es lo mi
 - **Exportación y notificación.** `larapack:import --dry-run` y después `larapack:import --force`: se regeneran `app/Exports/<Plural>Exports.php` y `app/Notifications/<Model>/ExportNotification.php`. En los que editaste, cambia `config('app.excel_view', 'app::excel.')` por `config('larapack.excel_view', 'excel.')`, y `app.notification_via` y `app.export_disk` por `larapack.notification_via` y `larapack.export_disk`.
 - **Configuración.** Si añadiste `excel_view`, `notification_via` o `export_disk` a `config/app.php`, llévalos a `config/larapack.php` (`larapack:config` lo crea) y quítalos de `config/app.php`.
 - **La migración de `users`.** Nada: `larapack:import` ya no la da por editada a mano ni pide una alteración contra ella. La omite con «no la generó LaraPack».
+
+## De 7.10.2 a 7.10.3 {#de-7102-a-7103}
+
+No cambia el contrato ni lo que se genera en PHP.
+
+- **La salida de `--format=json`.** Es un único documento JSON, también cuando algo falla: `{"ok": false, "error": "..."}` con código de salida 1. Si tu CI o tu agente recortaba el progreso de `larapack:import` antes de decodificar, ya no hace falta: decodifica la salida entera. Los avisos del laraimport van en `findings`.
+- **El token CSRF en las peticiones GET.** El contrato del modelo (`models/<entidad>/index.js`) ya no manda `_token` en `getPolicies`, `getPolicy`, `indexModel` ni `showModel`. Si no lo editaste, `larapack:import --vue --force` (o `--react`) lo regenera; si lo editaste, quita `_token: csrfToken(),` de esas cuatro llamadas. Las escrituras lo siguen mandando.
+- **Las tablas.** Sube `innoboxrr-vue-datatable` o `innoboxrr-react-datatable` a `^3.1.1`, que hace lo mismo con las peticiones de la tabla.
