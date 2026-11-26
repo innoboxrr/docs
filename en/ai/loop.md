@@ -275,7 +275,8 @@ orchestrates, and the real work in the class it belongs to.
 php vendor/bin/builder larapack:verify --format=json
 ```
 
-It compares the tree with `.larapack/manifest.json`:
+It compares the tree with `.larapack/manifest.json` and checks every controller,
+request and resource in the project, hand-written ones included:
 
 ```json
 {
@@ -303,7 +304,17 @@ It compares the tree with `.larapack/manifest.json`:
 | `route-not-declared` | error | A route, method, request or view for an action the model doesn't declare. Declare it in the JSON or remove it. |
 | `immutable-write` | error | An `immutable` model has a write path, or lost its `booted()` guard. |
 | `secret-exposed` | error | A `secret` column leaks through the API, the export or the table. |
+| `endpoint-missing` | error | A declared endpoint is missing a piece. The message says which; regenerate or write what's missing in its extension point. |
+| `controller-shape` | error | A controller does more than `return $request->handle();`. Move validation to `rules()`, authorization to `authorize()` and the work to its request's `handle()`, or declare the endpoint. **Don't mark it with `#[HandRolled]`.** |
+| `request-handle` | error | An action's request has no `handle()`. Write it. |
+| `controller-concern` | error or warning | A trait with logic in `Http/Controllers`. It belongs in `Http/Requests/Concerns`. |
+| `hand-rolled`, `hand-rolled-unapproved`, `hand-rolled-stale` | warning, error, warning | A `#[HandRolled]` exception and its approval. Not yours: say so in your answer and let the owner decide. |
+| `route-closure` | warning | A closure with a body as a route action. Move it to a controller that delegates. |
+| `index-managed`, `resource-appends` | warning | A listing that doesn't force `managed`, or a `setAppends()` without an allowlist. `larapack:fix` fixes them. |
 | `empty-manifest` | warning | The manifest records nothing: nothing was generated, or it's the wrong project. |
+
+If the project has the [guard](/en/ai/setup#guard), errors in the file the agent
+just edited reach it right away, with the rule: fix them, don't work around them.
 
 **Non-zero exit = you're not done yet.**
 
@@ -385,24 +396,31 @@ Everything the skill asks, in one list:
     alter migration. A foreign-key change is written by hand.
 16. **Export `routes.json` again** after adding an endpoint, and touch both sides of
     the front ↔ back contract when one changes.
-17. **Make every `callback` of a `route: false` action** a real export of
+17. **Declare a non-CRUD endpoint** in the model's `endpoints`, or in `controllers`
+    if it has no model, before writing a controller. See
+    [Declared endpoints](/en/larapack/endpoints).
+18. **If a controller has to be hand-written**, keep it at
+    `return $request->handle();` with a `FormRequest` of its own that authorizes,
+    validates and does the work.
+19. **Make every `callback` of a `route: false` action** a real export of
     `models/<kebab>/index.js`.
-18. **Write UI text as English keys** with `t()` in the front end and `__()` in
+20. **Write UI text as English keys** with `t()` in the front end and `__()` in
     Laravel, using placeholders: `t('Create :name', { name: t('Post') })`. Pass
     translated text to datatables and components (`labels`, `closeLabel`,
     `emptyText`…).
-19. **Change the look with CSS variables** (`--fe-primary`, `--fe-radius`…), use
+21. **Change the look with CSS variables** (`--fe-primary`, `--fe-radius`…), use
     `setTheme` only to point tokens at another design system, and request icons by
     semantic name (`setIcons`), also from a Resource: `'icon' => 'show'`.
-20. **Navigate in React with `buildPath('AdminShowPost', { id })`.**
-21. **Have forms notify on save** (`updateData` in Vue, `onUpdateData` in React) and
+22. **Navigate in React with `buildPath('AdminShowPost', { id })`.**
+23. **Have forms notify on save** (`updateData` in Vue, `onUpdateData` in React) and
     let the view that opened the drawer decide.
-22. **Ask with `confirmAction`** before deleting or exporting; cancelling rejects
+24. **Ask with `confirmAction`** before deleting or exporting; cancelling rejects
     with `RequestCancelledError` and nobody is told about it.
-23. **Declare providers once** with `larapack:providers` and `larapack:config` in a
+25. **Declare providers once** with `larapack:providers` and `larapack:config` in a
     package not created with `larapack:new`.
-24. **Reinstall the skill with `larapack:skill --force`** after upgrading LaraPack.
-25. **Finish with `larapack:verify` and the test suite green**, plus
+26. **Reinstall the skill with `larapack:skill --force`** after upgrading LaraPack.
+27. **Finish with `larapack:verify` and the test suite green**, none of its
+    controllers doing more than `return $request->handle();`, plus
     `larapack:audit` for a package.
 
 ## What the agent must not do
@@ -421,8 +439,8 @@ Everything the skill asks, in one list:
    method will exist, but the API will never load it.
 8. **Extend the UI with loose components.** A missing input means a missing `prop`
    with `form: true`.
-9. **Touch the controller.** It delegates to requests; anything different goes in the
-   request.
+9. **Touch the controller**, or write one with logic. It delegates to requests;
+   anything different goes in the request.
 10. **Touch the routes file.** A missing endpoint is missing from the JSON or the
     generator.
 11. **Edit `$fillable`, `$creatable`, `$updatable`, `$export_cols`,
@@ -449,3 +467,8 @@ Everything the skill asks, in one list:
     it needs a session with `auth: true` (`meta` in Vue, `handle` in React).
 25. **Notify about something the user chose not to do**, such as a cancelled
     confirmation.
+26. **Add `#[HandRolled]` to make `verify` pass**, edit `.larapack/hand-rolled.lock`
+    or run `larapack:hand-rolled approve` or `revoke`. The project owner approves
+    exceptions.
+27. **Work around the guard**: write a file the guard blocked some other way, or
+    switch its hooks off. What it blocks is a contract error.

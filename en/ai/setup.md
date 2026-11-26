@@ -99,11 +99,13 @@ example the application you'll use the package in. Inside a Laravel application,
 `larapack:new` leaves the agent everything it needs:
 
 - `.claude/skills/larapack/SKILL.md`, the skill already installed;
-- `AGENTS.md`, pointing at the skill for agents other than Claude Code;
+- `AGENTS.md`, with the LaraPack block pointing at the skill for agents other than
+  Claude Code;
+- `.claude/settings.json`, with the [guard](#guard) hooks already in place;
 - `composer.json` with the [baseline](/en/ci/) versions, LaraPack in `require-dev`,
   and `phpunit.xml.dist` with a first test;
-- `tests.yml` and `release.yml`, `pint.json`, `phpstan.neon.dist`, `VERSION` at
-  0.1.0 and `CHANGELOG.md`.
+- `tests.yml` —with the "LaraPack verify" job since 9.1— and `release.yml`,
+  `pint.json`, `phpstan.neon.dist`, `VERSION` at 0.1.0 and `CHANGELOG.md`.
 
 It refuses a directory that already has a `composer.json`, and
 `larapack:new acme/catalog --dry-run` reports exactly what it would create. The
@@ -137,8 +139,10 @@ the consistent choice: generated code doesn't depend on LaraPack at runtime.
 ## Install the skill
 
 ```bash
-php vendor/bin/builder larapack:skill                  # -> .claude/skills/larapack/SKILL.md
-php vendor/bin/builder larapack:skill --path=AGENTS.md # for agents that read AGENTS.md
+php vendor/bin/builder larapack:skill                  # -> .claude/skills/larapack/SKILL.md and the AGENTS.md block
+php vendor/bin/builder larapack:skill --hooks          # plus the guard in .claude/settings.json
+php vendor/bin/builder larapack:skill --no-agents      # only the skill
+php vendor/bin/builder larapack:skill --path=AGENTS.md # the whole skill in AGENTS.md
 php vendor/bin/builder larapack:skill --print          # to standard output
 php vendor/bin/builder larapack:skill --source         # path of the original inside vendor/
 php vendor/bin/builder larapack:skill --force          # overwrite the destination
@@ -152,6 +156,8 @@ Inside an application, the same with `php artisan larapack:skill`.
 | `--print` | Writes the skill to standard output and installs nothing. |
 | `--source` | Prints only the path of the original inside the package. |
 | `--force` | Overwrites the destination even if it exists and differs. |
+| `--hooks` | Merges the [guard](#guard) hooks into `.claude/settings.json`. |
+| `--no-agents` | Doesn't write the LaraPack block into `AGENTS.md`. |
 | `--root=PATH` | The project to install into, if not the discovered one. |
 
 **Why a copy.** No agent reads a package inside `vendor/`: neither Claude Code nor
@@ -171,43 +177,53 @@ module.
 
 They read `AGENTS.md`. There are two ways to give it to them:
 
-- **A short `AGENTS.md` that points at the skill.** This is what `larapack:new`
-  creates (in Spanish):
+- **A short block that points at the skill**, which is what `larapack:skill` writes
+  since 9.0. It sits between `<!-- LARAPACK:BEGIN -->` and `<!-- LARAPACK:END -->`:
+  it creates the file if missing, appends the block if there are no markers and, if
+  there are, only rewrites what's inside. Project rules go outside the markers and
+  aren't touched. The block states the rule in five points —it's declared and
+  generated; a non-CRUD endpoint is declared too; the controller only does
+  `return $request->handle();`; `#[HandRolled]` is approved by the owner;
+  `validate` and `verify` green before finishing— and points to the skill. Like
+  the skill, it's written in Spanish.
+- **The whole skill in `AGENTS.md`**, with `larapack:skill --path=AGENTS.md`. Then
+  the block isn't added, since it would repeat it, and the file belongs to the
+  package: project rules go in another one.
 
-  ````md
-  # Instrucciones para agentes
+`--no-agents` skips the block.
 
-  La arquitectura de este paquete la genera LaraPack. Antes de crear o cambiar un
-  modelo, un endpoint, una request, una política, una migración o una vista, lee
-  `.claude/skills/larapack/SKILL.md` y sigue su flujo: se declara en
-  `laraimport.json` y se genera, no se escribe a mano.
+### The guard {#guard}
 
-  Si ese archivo falta, o LaraPack se actualizó:
+`larapack:skill --hooks` turns the rule into Claude Code hooks, merged into
+`.claude/settings.json` without duplicating or touching the ones already there:
 
-  ```
-  php vendor/bin/builder larapack:skill --force
-  ```
-  ````
+| Hook | Matcher | Runs | What it does |
+|---|---|---|---|
+| PostToolUse | `Write\|Edit\|MultiEdit` | `larapack:guard` | If the edited file is a controller, a request, a route, a policy, a migration or something generated that isn't an extension point, it runs `verify`'s checks on it. With errors in that file it exits with 2: Claude Code blocks and hands the model the reason and the rule. |
+| Stop | — | `larapack:guard --stop` | Verifies the project at the end of the turn. It only holds back for errors in what the session touched; the rest it reports without blocking. |
+| PreToolUse (9.1) | `Write\|Edit\|MultiEdit\|Bash` | `larapack:guard --pre` | Prevents editing `.larapack/hand-rolled.lock` and running `larapack:hand-rolled approve` or `revoke`, also through an alias, an abbreviation or inside `bash -c`. It reads the command the way the shell would, without running it, and only wakes PHP if the input contains `approve`, `revoke` or `hand-rolled`. |
 
-  It says: LaraPack generates this package's architecture; before creating or
-  changing a model, endpoint, request, policy, migration or view, read the skill and
-  follow its flow; if the file is missing or LaraPack was upgraded, run
-  `larapack:skill --force`.
+The command uses `$CLAUDE_PROJECT_DIR`, which needs a shell that expands variables
+(on Windows, Git Bash), and does nothing while `vendor/` doesn't exist. Commit
+`.claude/settings.json` so every session has it.
 
-- **The whole skill in `AGENTS.md`**, with `larapack:skill --path=AGENTS.md`.
-
-::: warning
-In a package created with `larapack:new`, `AGENTS.md` already exists. Without
-`--force`, `--path=AGENTS.md` leaves it alone; with `--force` it replaces the pointer
-(and any project rules you added) with the full skill.
+::: warning Turn it on with `verify` green
+In a project with existing errors, every edit to those files and every end of turn
+that touches them would hold the agent back for something it didn't cause. First a
+clean `larapack:verify`, then `--hooks`. In a project coming from 8.x, the
+[upgrade guide](/en/larapack/upgrade#from-80-to-90) says how to get there.
 :::
+
+The guard helps the agent; it isn't the barrier. An agent without hooks, another
+editor or a path the guard doesn't see get around it. The barrier is CI: see
+[Why it works](/en/ai/#guard) and [In CI](/en/larapack/verify#ci).
 
 ### After upgrading LaraPack
 
 The instructions travel with the generator version. After every upgrade:
 
 ```bash
-php vendor/bin/builder larapack:skill --force
+php vendor/bin/builder larapack:skill --force          # with --hooks if you use them: adds the new ones
 ```
 
 Without `--force`, a destination that differs from the package isn't overwritten, so
@@ -239,6 +255,9 @@ Before asking the agent for anything:
    `formatted` is `null`.
 5. **The test suite passes:** `vendor/bin/phpunit`.
 6. **In a package, `larapack:audit` has no errors.**
+7. **The guard is on** (`larapack:skill --hooks`), once `verify` is green.
+8. **CI runs `verify --strict`** and the branch requires it: `larapack:ci` sets that
+   up. See [In CI](/en/larapack/verify#ci).
 
 With that, the agent starts from green and any red that shows up is its own. Continue
 with [The agent loop](/en/ai/loop).

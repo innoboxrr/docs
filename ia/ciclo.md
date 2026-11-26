@@ -273,7 +273,8 @@ algo en `laraimport.json`, no hay que salirse.
 php vendor/bin/builder larapack:verify --format=json
 ```
 
-Compara el árbol con `.larapack/manifest.json`:
+Compara el árbol con `.larapack/manifest.json` y revisa todos los controladores,
+requests y resources del proyecto, también los escritos a mano:
 
 ```json
 {
@@ -301,7 +302,18 @@ Compara el árbol con `.larapack/manifest.json`:
 | `route-not-declared` | error | Una ruta, un método, una request o una vista de una acción que el modelo no declara. Declárala en el JSON o retírala. |
 | `immutable-write` | error | Un modelo `immutable` tiene un camino de escritura, o perdió la guarda de `booted()`. |
 | `secret-exposed` | error | Una columna `secret` sale por la API, la exportación o la tabla. |
+| `endpoint-missing` | error | A un endpoint declarado le falta una pieza. El mensaje dice cuál; regenera o escribe lo que falta en su hueco. |
+| `controller-shape` | error | Un controlador hace algo más que `return $request->handle();`. Mueve la validación a `rules()`, la autorización a `authorize()` y el trabajo a `handle()` de su request, o declara el endpoint. **No lo marques con `#[HandRolled]`.** |
+| `request-handle` | error | La request de una acción no tiene `handle()`. Escríbelo. |
+| `controller-concern` | error o aviso | Un trait con lógica en `Http/Controllers`. Su sitio es `Http/Requests/Concerns`. |
+| `hand-rolled`, `hand-rolled-unapproved`, `hand-rolled-stale` | aviso, error, aviso | Una excepción `#[HandRolled]` y su aprobación. No es tuya: dilo en tu respuesta y deja que el dueño decida. |
+| `route-closure` | aviso | Un closure con cuerpo como acción de una ruta. Pásalo a un controlador que delegue. |
+| `index-managed`, `resource-appends` | aviso | Un listado que no fuerza `managed`, o un `setAppends()` sin lista blanca. `larapack:fix` lo arregla. |
 | `empty-manifest` | aviso | El manifiesto no registra nada: no se generó nada, o el proyecto no es el correcto. |
+
+Si el proyecto tiene la [guardia](/ia/preparar#guardia), los errores del archivo
+que el agente acaba de editar le llegan en el momento, con la regla: se corrigen,
+no se rodean.
 
 **Código distinto de cero = aún no has terminado.**
 
@@ -385,27 +397,34 @@ Todo lo que la skill le pide, en una lista:
     mano.
 16. **Volver a exportar `routes.json`** después de añadir un endpoint, y tocar los
     dos lados del contrato front ↔ back cuando cambie uno.
-17. **Que cada `callback` de una acción con `route: false`** sea un export real de
+17. **Declarar un endpoint que no es CRUD** en `endpoints` del modelo, o en
+    `controllers` si no tiene modelo, antes de escribir un controlador. Ver
+    [Endpoints declarados](/larapack/endpoints).
+18. **Si un controlador tiene que escribirse a mano**, dejarlo en
+    `return $request->handle();` con un `FormRequest` propio que autoriza,
+    valida y hace el trabajo.
+19. **Que cada `callback` de una acción con `route: false`** sea un export real de
     `models/<kebab>/index.js`.
-18. **Escribir los textos como claves en inglés** con `t()` en el front y `__()` en
+20. **Escribir los textos como claves en inglés** con `t()` en el front y `__()` en
     Laravel, con marcadores: `t('Create :name', { name: t('Post') })`. A los
     datatables y componentes, pasarles sus textos traducidos (`labels`,
     `closeLabel`, `emptyText`…).
-19. **Cambiar el aspecto con variables CSS** (`--fe-primary`, `--fe-radius`…),
+21. **Cambiar el aspecto con variables CSS** (`--fe-primary`, `--fe-radius`…),
     usar `setTheme` sólo para apuntar tokens a otro sistema visual y pedir los
     iconos por nombre semántico (`setIcons`), también desde un Resource:
     `'icon' => 'show'`.
-20. **Navegar en React con `buildPath('AdminShowPost', { id })`.**
-21. **Que un formulario avise al guardar** (`updateData` en Vue, `onUpdateData` en
+22. **Navegar en React con `buildPath('AdminShowPost', { id })`.**
+23. **Que un formulario avise al guardar** (`updateData` en Vue, `onUpdateData` en
     React) y deje decidir a la vista que abrió el drawer.
-22. **Preguntar con `confirmAction`** antes de borrar o exportar; cancelar rechaza
+24. **Preguntar con `confirmAction`** antes de borrar o exportar; cancelar rechaza
     con `RequestCancelledError` y no se avisa de ello.
-23. **Declarar los proveedores una vez** con `larapack:providers` y
+25. **Declarar los proveedores una vez** con `larapack:providers` y
     `larapack:config` en un paquete que no creó `larapack:new`.
-24. **Reinstalar la skill con `larapack:skill --force`** después de actualizar
+26. **Reinstalar la skill con `larapack:skill --force`** después de actualizar
     LaraPack.
-25. **Terminar con `larapack:verify` y la suite en verde**, y `larapack:audit` si
-    es un paquete.
+27. **Terminar con `larapack:verify` y la suite en verde**, ningún controlador suyo
+    haciendo más que `return $request->handle();`, y `larapack:audit` si es un
+    paquete.
 
 ## Lo que el agente no debe hacer
 
@@ -424,7 +443,8 @@ Todo lo que la skill le pide, en una lista:
    método existirá, pero la API no la cargará nunca.
 8. **Ampliar la interfaz con componentes sueltos.** Si falta un input, falta una
    `prop` con `form: true`.
-9. **Tocar el controlador.** Delega en las requests; lo distinto va en la request.
+9. **Tocar el controlador**, ni escribir uno con lógica. Delega en las requests;
+   lo distinto va en la request.
 10. **Tocar el archivo de rutas.** Si falta un endpoint, falta en el JSON o en el
     generador.
 11. **Editar `$fillable`, `$creatable`, `$updatable`, `$export_cols`,
@@ -452,3 +472,8 @@ Todo lo que la skill le pide, en una lista:
     lo declara cada ruta con `auth: true` (`meta` en Vue, `handle` en React).
 25. **Avisar de lo que el usuario decidió no hacer**, como una confirmación
     cancelada.
+26. **Añadir `#[HandRolled]` para que `verify` pase**, editar
+    `.larapack/hand-rolled.lock` o correr `larapack:hand-rolled approve` o
+    `revoke`. Las excepciones las aprueba el dueño del proyecto.
+27. **Rodear la guardia**: escribir por otra vía un archivo que la guardia
+    bloqueó, o desactivar sus hooks. Lo que bloquea es un error del contrato.

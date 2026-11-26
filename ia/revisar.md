@@ -54,6 +54,11 @@ El modelo es una fachada: un método en `Operations` que orquesta, y el trabajo
 real en la clase que le toque. Busca lógica en sitios donde no va: el controlador,
 el archivo de rutas, una vista.
 
+`verify` ya garantiza que ningún controlador hace más que
+`return $request->handle();`. Lo que no puede saber es si lo que hay dentro de la
+request, la política o la operación es lo que pide el negocio: eso es lo que se
+revisa aquí, y lo que tienen que probar los tests del paso 5.
+
 ### 4. Que `verify` sólo marque como editados los huecos
 
 ```bash
@@ -72,6 +77,13 @@ vea pedidos ajenos, que la política rechace a quien debe. Si el agente sólo de
 los generados, no hay tests del cambio.
 
 ## Además
+
+- **Cada `#[HandRolled]` nuevo y cada cambio en `.larapack/hand-rolled.lock`.**
+  Una excepción al patrón la aprueba el dueño del proyecto, no quien la escribe.
+  Pregunta por qué no se pudo declarar como endpoint ni resolver con un
+  `FormRequest` (`failedValidation()` y `failedAuthorization()` cubren casi todos
+  los protocolos). Con [`larapack:ci`](/larapack/verificar#ci), CODEOWNERS te
+  pide esa revisión.
 
 - **`.larapack/manifest.json` cambia con el código.** Un commit que genera sin
   actualizar el manifiesto deja al generador a ciegas.
@@ -98,6 +110,10 @@ los generados, no hay tests del cambio.
 | Editó la migración de creación de una tabla ya migrada | El cambio no llega a la base y LaraPack deja de poder escribir alteraciones |
 | Textos en español o inglés fijos en una vista | Deberían ser claves con `t()` |
 | Tests generados editados para que pasen | Los generados pasan recién generados: si fallan, algo se rompió |
+| Un controlador con validación, autorización o consultas dentro | `verify` falla con `controller-shape`: va en la request, o se declara como endpoint |
+| Un `#[HandRolled]` que nadie pidió | Una forma de que `verify` pase sin arreglar nada; con candado, falla como no aprobada |
+| Cambios en `.larapack/hand-rolled.lock` hechos por el agente | La aprobación es del dueño; la guardia lo bloquea, así que el agente la rodeó |
+| Hooks de `.claude/settings.json` quitados o cambiados | El agente apagó la guardia |
 
 Ante cualquiera, la respuesta es la misma: pedir que lo declare en
 `laraimport.json`, regenere y vuelva a verificar.
