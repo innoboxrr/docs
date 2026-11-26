@@ -147,7 +147,7 @@ jobs:
 
 | Input | Default | What it does |
 |---|---|---|
-| `node-versions` | `'["20", "22", "24"]'` | Node versions in the matrix |
+| `node-versions` | `'["20", "22", "24"]'` | Node versions in the matrix. The ecosystem's packages pass `'["22", "24"]'`: see [the test toolchain](#node) |
 | `working-directory` | `'.'` | The package directory, if not the root |
 
 For each Node version: checkout, `npm install --no-audit --no-fund` (no lockfile, for
@@ -271,6 +271,51 @@ LaraPack also tests PHP 8.5 (`php-versions: '["8.3", "8.4", "8.5"]'`): 8.3 resol
 `symfony/console` 7.4 and 8.4 or later resolves 8.x, which have different signatures
 in `Command::configure()`.
 
+### `verify`: LaraPack verify {#verify}
+
+Since LaraPack 9.1, packages created by `larapack:new` carry a third job in
+`tests.yml` that runs LaraPack's contract with `--strict`:
+
+```yaml
+    verify:
+        name: LaraPack verify
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v5
+
+            - uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  coverage: none
+
+            - name: Instalar dependencias
+              run: composer update --prefer-dist --no-interaction --no-progress
+
+            - name: Contrato de LaraPack
+              run: php vendor/bin/builder larapack:verify --strict --format=json
+```
+
+**The job name is the name of the check** branch protection requires: if it changes,
+the protection waits for a check that never arrives and blocks everything.
+`--strict` counts warnings as failures, so an unapproved `#[HandRolled]` exception
+doesn't get in.
+
+In an existing project —an application, or a package created before 9.1—,
+`larapack:ci` writes the same job to `.github/workflows/larapack.yml`: in an
+application with `php artisan`, with the PHP from `config.platform.php` or the
+minimum `composer.lock` installs with, and with `pull_request` and `push` to the
+default branch. With `--owner` it adds CODEOWNERS, and it prints the command that
+protects the branch for the owner to run. `larapack:audit` warns with `verify-job`
+a package that uses LaraPack without this job. The why and the steps are in
+[In CI](/en/larapack/verify#ci).
+
+<!-- revisar tras integrar 9.1 -->
+
+If the project runs its workflows on its own runners, `larapack:ci --runs-on` puts
+the job there: a job that never starts leaves the required check pending, and
+nothing merges.
+
 ### `frontend`: the base application's interfaces
 
 `innoboxrr/laravel-setup` copies its interfaces as-is into every new application: if
@@ -303,22 +348,31 @@ their tests fail, nothing is released.
             - run: npx vitest run
 ```
 
-## Why satellites stay on Vite 7 and Vitest 3
+## The npm packages' test toolchain {#node}
 
-The ecosystem's npm packages test with **Vite 7 and Vitest 3**, and the baseline pins
-it (`js.vite: ^7.1.0`, `js.vitest: ^3.0.0`). Applications and generated modules are
-already on **Vite 8**, Laravel 13's.
+Since LaraPack 9.0, the ecosystem's npm packages test with **Vite 8 and Vitest 5**,
+on **Node 22 and 24**, and declare `engines.node >=22.12`. That's what the baseline
+pins (`js.vite: ^8.0.0`, `js.vitest: ^5.0.0`, `node.engines: >=22.12`), and what
+`larapack:audit` checks.
 
-The reason is npm: **Vitest 4 with Vite 8.3 crashes `npm install` on npm 10**, the npm
-bundled with Node 20 and 22, two of the three versions in the `node-tests.yml` matrix.
-With npm 11 the suites pass, but CI installs with each Node's own npm.
+Vitest 5 requires Node `^22.12 || >=24`, and Node 20 has been EOL since 30 April
+2026. The `node-versions` input of `node-tests.yml` still defaults to
+`'["20", "22", "24"]'`, so **each package passes it** in its `tests.yml`:
 
-A generated module can require Vite 8 because it doesn't install Vitest. For the same
-reason, laravel-setup's React test harness (`tests/Frontend/react`) uses `vite ^7.1`,
-`@vitejs/plugin-react ^5` and `vitest ^3.2`, even though the application it copies
-requires `vite ^8` and `@vitejs/plugin-react ^6`.
+```yaml
+jobs:
+    tests:
+        uses: innoboxrr/.github/.github/workflows/node-tests.yml@main
+        # No Node 20: EOL since 2026-04-30, and Vitest 5 requires ^22.12 || >=24.
+        with:
+            node-versions: '["22", "24"]'
+```
 
-This gets revisited when npm 10 fixes it or CI moves to npm 11.
+Up to 8.x the satellites stayed on Vite 7 and Vitest 3, because Vitest 4 with Vite
+8.3 made `npm install` fail with the npm 10 bundled with Node 20 and 22. With Vitest
+5 and no Node 20 in the matrix, that blocker is gone. laravel-setup's React test
+harness (`tests/Frontend/react`) is still on `vite ^7.1` and `vitest ^3.2`: it isn't
+a published package and doesn't go through the audit.
 
 ## Common CI problems
 

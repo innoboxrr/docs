@@ -732,8 +732,10 @@ service goes in `suggest`.
 **Cause.** Vitest 4 with Vite 8.3 won't install with npm 10, the npm bundled with Node 20
 and 22.
 
-**Fix.** The ecosystem's npm packages stay on `vite ^7.1` and `vitest ^3`. See
-[The workflows](/en/ci/workflows#why-satellites-stay-on-vite-7-and-vitest-3).
+**Fix.** Move to Vitest 5 and drop Node 20 from the matrix, as the ecosystem's
+packages did with LaraPack 9.0: `vite ^8`, `vitest ^5`, `engines.node >=22.12` and
+`node-versions: '["22", "24"]'`. See
+[The npm packages' test toolchain](/en/ci/workflows#node).
 
 ### The npm release finished and `npm view` still shows the old version
 

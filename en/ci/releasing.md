@@ -190,9 +190,8 @@ what can't be missing is the reason and what whoever upgrades must do.
 
 ### npm package
 
-1. `npm install` and `npm test` pass, ideally with npm 10 (Node 20 or 22), which is
-   what CI uses.
-2. `version` bumped in `package.json`; `engines.node` is `>=20`; `name`, `license`,
+1. `npm install` and `npm test` pass on Node 22 and on Node 24, the ones CI uses.
+2. `version` bumped in `package.json`; `engines.node` is `>=22.12`; `name`, `license`,
    `type`, `exports`, `files` and `sideEffects` are present.
 3. `CHANGELOG.md` updated.
 4. Trusted publisher configured on npmjs.com (essential for a new package), and no

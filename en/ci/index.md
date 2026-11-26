@@ -69,7 +69,7 @@ existe."). Messages are in Spanish:
     "version": 1,
     "php": {
         "require": "^8.3",
-        "matrix": ["8.3", "8.4"]
+        "matrix": ["8.3", "8.4", "8.5"]
     },
     "laravel": {
         "illuminate": "^13.0",
@@ -81,32 +81,32 @@ existe."). Messages are in Spanish:
         "larastan/larastan": "^3.0"
     },
     "node": {
-        "engines": ">=20",
+        "engines": ">=22.12",
         "ci": "22"
     },
     "js": {
-        "vite": "^7.1.0",
-        "vitest": "^3.0.0",
+        "vite": "^8.0.0",
+        "vitest": "^5.0.0",
         "vue": "^3.5.0",
         "react": "^19.0.0"
     },
     "internal": {
-        "innoboxrr/larapack-generator": "^7.10",
+        "innoboxrr/larapack-generator": "^9.0",
         "innoboxrr/traits": "^2.1",
         "innoboxrr/support": "^2.1",
         "innoboxrr/search-surge": "^3.0"
     },
     "internalNpm": {
-        "innoboxrr-form-core": "^2.8.0",
-        "innoboxrr-form-elements": "^6.7.0",
-        "innoboxrr-react-form-elements": "^3.7.0",
-        "innoboxrr-vue-datatable": "^3.1.0",
-        "innoboxrr-react-datatable": "^3.1.0",
-        "innoboxrr-http-request": "^2.0.0",
-        "innoboxrr-i18n": "^1.2.0",
-        "innoboxrr-locale-generator": "^2.0.0",
-        "innoboxrr-js-validator": "^2.0.0",
-        "innoboxrr-route-resolver": "^2.0.0"
+        "innoboxrr-form-core": "^2.9.0",
+        "innoboxrr-form-elements": "^6.9.0",
+        "innoboxrr-react-form-elements": "^3.9.0",
+        "innoboxrr-vue-datatable": "^3.2.0",
+        "innoboxrr-react-datatable": "^3.2.0",
+        "innoboxrr-http-request": "^2.1.0",
+        "innoboxrr-i18n": "^1.3.0",
+        "innoboxrr-locale-generator": "^2.1.0",
+        "innoboxrr-js-validator": "^2.1.0",
+        "innoboxrr-route-resolver": "^2.1.0"
     },
     "generated": {
         "require": {
@@ -125,7 +125,7 @@ existe."). Messages are in Spanish:
 }
 ```
 
-(Without the `$comment*` keys the real file carries.)
+(Without the `$comment*` keys the real file carries. This is LaraPack 9.0's.)
 
 | Key | What it sets | Who uses it |
 |---|---|---|
@@ -164,6 +164,7 @@ runs the Composer checks, with `package.json` the npm ones, and with both, both.
 | `no-tests` | error | No `*Test.php` at all | Add at least one test |
 | `workflow-missing` | error | `.github/workflows/tests.yml` or `release.yml` is missing | Create it (see [The workflows](/en/ci/workflows)) |
 | `bump-patch` | error or warning | A `bump-patch.yml` is still there | Replace it with `release.yml` |
+| `verify-job` | warning | The package uses LaraPack and no workflow runs `larapack:verify --strict` (since 9.1) | Add the "LaraPack verify" job: `larapack:ci`, or copy it from a freshly created package. See [The workflows](/en/ci/workflows#verify) |
 
 Where each one looks:
 
@@ -179,19 +180,58 @@ Where each one looks:
   suite, and a warning if it waits (`workflow_run:` or `needs: tests`): it doesn't
   publish blind, but it guesses the version from the last tag instead of declaring
   it.
+- **`verify-job`** only looks at packages that use LaraPack, and searches their
+  workflows for `larapack:verify --strict`. With `larapack:audit --strict` in CI,
+  the warning turns it red until the job exists.
+
+<!-- revisar tras integrar 9.1 -->
+
+In a monorepo, a package under `packages/` whose root already runs `verify --strict`
+doesn't need its own job: the root's `verify` goes through `packages/*`. 9.1 stops
+warning in that case.
 
 ### npm packages
 
 | Code | Level | When it fires | What to do |
 |---|---|---|---|
 | `npm-field` | warning | `name`, `version`, `license`, `type`, `exports`, `files` or `sideEffects` is missing | Add it. The key is what's checked: `"sideEffects": false` is valid |
-| `node-engines` | warning | `engines.node` isn't exactly `>=20` | `"engines": { "node": ">=20" }`. It compares text: `>=20.0.0` also warns |
+| `node-engines` | warning | `engines.node` isn't exactly `>=22.12` | `"engines": { "node": ">=22.12" }`. It compares text: `>=22` also warns |
 | `js-version` | error or warning | `vite`, `vitest`, `vue` or `react` in `dependencies` or `devDependencies`, against `js` | See the rule |
 | `workflow-missing` | error | `tests.yml` or `release.yml` is missing | Create it |
 | `bump-patch` | error or warning | A `bump-patch.yml` is still there | Replace it |
 
 `peerDependencies` are left out on purpose. A library declaring `react: ^18 || ^19` is
 doing the right thing: it says what it can run against, not what it's built with.
+
+### The test toolchain: Node 22.12, Vite 8 and Vitest 5 {#node}
+
+Since LaraPack 9.0 the npm packages' baseline is **Vite 8 and Vitest 5**, and
+`engines.node` moves to **`>=22.12`**. There are two reasons: Vitest 5 requires
+Node `^22.12 || >=24`, and Node 20 has been EOL since 30 April 2026. The ten
+`innoboxrr-*` packages have already moved (`innoboxrr-form-core` 2.9.0,
+`innoboxrr-form-elements` 6.9.0, `innoboxrr-react-form-elements` 3.9.0, the
+datatables 3.2.0 and the rest at their next minor version), and their CI tests Node
+22 and 24.
+
+Your own npm package still on `vitest ^3` or `engines >=20` now shows up in
+`larapack:audit` (`js-version`, `node-engines`). To align it:
+
+1. In `devDependencies`, `vite` `^8.0.0` and `vitest` `^5.0.0` (and whatever depends
+   on them, such as `jsdom` or `@vitejs/plugin-*`).
+2. In `package.json`, `"engines": { "node": ">=22.12" }`.
+3. In its `tests.yml`, the matrix without Node 20:
+
+   ```yaml
+   jobs:
+       tests:
+           uses: innoboxrr/.github/.github/workflows/node-tests.yml@main
+           # No Node 20: it's EOL and Vitest 5 requires ^22.12 || >=24.
+           with:
+               node-versions: '["22", "24"]'
+   ```
+
+The UI module LaraPack generates already required Vite 8; with 9.0 its `innoboxrr-*`
+dependencies move up to the versions above (`internalNpm`).
 
 ### Neither
 
@@ -261,8 +301,8 @@ CI runs.
 :::
 
 An **application** doesn't go through the audit, so it can require the minimum
-directly: `app:setup` writes `innoboxrr/larapack-generator: ^7.10.2` into the
-`require-dev` of the application it creates.
+directly: `app:setup` writes the LaraPack version it needs into the `require-dev`
+of the application it creates.
 
 ## What it doesn't check
 

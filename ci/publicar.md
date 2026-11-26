@@ -189,9 +189,8 @@ es el porqué y lo que tiene que hacer quien actualiza.
 
 ### Paquete npm
 
-1. `npm install` y `npm test` pasan, a ser posible con npm 10 (Node 20 o 22), que es el
-   de la CI.
-2. `version` subida en `package.json`; `engines.node` es `>=20`; están `name`,
+1. `npm install` y `npm test` pasan con Node 22 y con Node 24, los de la CI.
+2. `version` subida en `package.json`; `engines.node` es `>=22.12`; están `name`,
    `license`, `type`, `exports`, `files` y `sideEffects`.
 3. `CHANGELOG.md` actualizado.
 4. Trusted publisher configurado en npmjs.com (imprescindible en un paquete nuevo), y
