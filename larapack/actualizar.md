@@ -22,7 +22,10 @@ Mira la versión instalada con `composer show innoboxrr/larapack-generator` y bu
 | 7.9 | Bajo | El proveedor de eventos se regenera | [7.9 → 7.10](#de-79-a-710) y siguientes |
 | 7.10.0 | Nada en un paquete; bajo en una aplicación | En una aplicación, factories y tests a regenerar | [7.10.0 → 7.10.1](#de-7100-a-7101) y siguientes |
 | 7.10.1 | Nada en un paquete; bajo en una aplicación | En una aplicación, la exportación y su notificación a regenerar | [7.10.1 → 7.10.2](#de-7101-a-7102) y siguientes |
-| 7.10.2 | Bajo | La salida de `--format=json` y el contrato del modelo sin `_token` por GET | [7.10.2 → 7.10.3](#de-7102-a-7103) |
+| 7.10.2 | Bajo | La salida de `--format=json` y el contrato del modelo sin `_token` por GET | [7.10.2 → 7.10.3](#de-7102-a-7103) y siguientes |
+| 7.10.3 | Bajo | Claves ajenas `restrict` en tablas nuevas | [7.10 → 8.0](#de-710-a-80) y siguientes |
+| 8.x | Alto en una aplicación con controladores escritos a mano; bajo si no | `verify` revisa todos los controladores; el Resource filtra `appends`; el nombre del modelo se valida | [8.0 → 9.0](#de-80-a-90) y siguientes |
+| 9.0 | Nada hasta que se activa | El candado de `#[HandRolled]`, el check obligatorio en la CI y los tests de autorización | [9.0 → 9.1](#de-90-a-91) |
 
 ## El procedimiento, sea cual sea la versión
 
@@ -31,7 +34,7 @@ Mira la versión instalada con `composer show innoboxrr/larapack-generator` y bu
 3. **Actualiza el generador**, con `--dev` si lo tienes en `require-dev`:
 
    ```bash
-   composer require --dev innoboxrr/larapack-generator:"^7.10"
+   composer require --dev innoboxrr/larapack-generator:"^9.0"
    ```
 
 4. **Actualiza las instrucciones del agente**: `php vendor/bin/builder larapack:skill --force`.
@@ -358,3 +361,114 @@ No cambia el contrato ni lo que se genera en PHP.
 - **La salida de `--format=json`.** Es un único documento JSON, también cuando algo falla: `{"ok": false, "error": "..."}` con código de salida 1. Si tu CI o tu agente recortaba el progreso de `larapack:import` antes de decodificar, ya no hace falta: decodifica la salida entera. Los avisos del laraimport van en `findings`.
 - **El token CSRF en las peticiones GET.** El contrato del modelo (`models/<entidad>/index.js`) ya no manda `_token` en `getPolicies`, `getPolicy`, `indexModel` ni `showModel`. Si no lo editaste, `larapack:import --vue --force` (o `--react`) lo regenera; si lo editaste, quita `_token: csrfToken(),` de esas cuatro llamadas. Las escrituras lo siguen mandando.
 - **Las tablas.** Sube `innoboxrr-vue-datatable` o `innoboxrr-react-datatable` a `^3.1.1`, que hace lo mismo con las peticiones de la tabla.
+
+## De 7.10 a 8.0 {#de-710-a-80}
+
+Las claves ajenas de las tablas nuevas salen con `restrict` en vez de `cascade` (los pivotes siguen en `cascade`), y `table_prefix` es nuevo y opcional. **Las tablas que ya existen no se tocan**: el generador reutiliza su migración de creación y, si una clave ajena cambió, deja un comentario para escribir la alteración a mano. Si dependías de la cascada en tablas nuevas, decláralo en la propiedad con `"on_delete": "cascade"`.
+
+## De 8.0 a 9.0 {#de-80-a-90}
+
+**Cambia lo que `verify` deja pasar.** Antes sólo miraba el manifiesto; ahora revisa todos los controladores del proyecto y de sus paquetes locales, y un proyecto que pasaba puede fallar. El contrato no rompe: [`endpoints` y `controllers`](/larapack/endpoints) son nuevos y opcionales. Lo generado sólo cambia en el IndexRequest, el Resource y la exportación.
+
+Los tres cambios que rompen:
+
+| Cambio | A quién afecta |
+|---|---|
+| `verify` revisa la forma de todos los controladores (`controller-shape`, `request-handle`, `controller-concern`) | A quien tiene controladores escritos a mano con lógica, o traits de autorización en `Http/Controllers`. |
+| El Resource sólo añade los `appends` que declara en `$appendable` | A quien pedía accessors desde el cliente con `appends[]`. Ni la interfaz generada ni las aplicaciones conocidas los piden. |
+| El nombre del modelo se valida en la línea de órdenes | A un script que llamaba a `larapack:model` con guiones o rutas. |
+
+En este orden:
+
+1. **Actualiza y mira dónde estás, sin la guardia todavía:**
+
+   ```bash
+   composer require --dev innoboxrr/larapack-generator:"^9.0"
+   php artisan larapack:skill --force
+   php artisan larapack:verify --format=json
+   ```
+
+   En una aplicación real de 80 paquetes falló en cuatro controladores escritos a mano —un listado de módulos, el canje de un token, un registro LTI y un webhook— y en los traits de autorización de `Http/Controllers/Concerns`. Para mirar sólo eso: `--check=controller-shape --check=request-handle --check=controller-concern`.
+
+2. **Cada controlador escrito a mano, a su sitio.** Por orden de preferencia:
+
+   - **Declararlo.** Si actúa sobre un modelo, en sus `endpoints`; si no, en `controllers[]`. `larapack:import` genera el controlador, la ruta, la request, la habilidad y el test; la lógica pasa a `handle()` o a la operación del modelo, y se borran el controlador y la ruta escritos a mano. La ruta generada tiene otro nombre: actualiza el front que llamaba a la vieja y vuelve a exportar `routes.json`.
+
+     ```json
+     "controllers": [
+         { "name": "Platform", "endpoints": [ { "name": "installedModules", "method": "get" } ] }
+     ]
+     ```
+
+   - **Dejarlo a mano con un `FormRequest`.** El controlador queda en `return $request->handle();`; `authorize()` autoriza, `rules()` valida y `handle()` hace el trabajo o lo delega. Si el protocolo dicta la forma del error, sobrescribe `failedValidation()` o `failedAuthorization()` en la request; la firma sobre el cuerpo en bruto se comprueba ahí con `$this->getContent()`. La skill trae un ejemplo antes y después.
+   - **`#[HandRolled('razón')]`, sólo si el dueño del proyecto lo aprueba.** No es un arreglo: `verify` lo sigue listando como aviso y con `--strict` falla.
+
+3. **Los traits de `Http/Controllers/Concerns` que sólo usan requests** se mueven a `Http/Requests/Concerns` (cambia su namespace y el `use` de cada request). Uno que usa un controlador es error: su lógica va a la request.
+
+4. **Regenera lo que no editaste**, primero en simulación: `larapack:import --dry-run --force` y `larapack:import --force`. Así recibes el IndexRequest que fuerza `managed`, el Resource con `$appendable` y la exportación que guarda como texto lo que empieza por `=`.
+
+5. **Lleva la seguridad a lo editado.** `verify` avisa con `index-managed` y `resource-appends`, y [`larapack:fix`](/larapack/verificar#fix) lo arregla en todos los archivos a la vez:
+
+   ```bash
+   php artisan larapack:fix index-managed resource-appends --dry-run
+   php artisan larapack:fix index-managed resource-appends
+   php artisan larapack:verify --check=index-managed --check=resource-appends
+   ```
+
+   Lo que salte (`skipped`, con su razón) se hace a mano:
+
+   ```php
+   // IndexRequest: el listado siempre pasa por ManagedFilter::canView().
+   protected function prepareForValidation(): void
+   {
+       $this->merge(['managed' => true]);
+   }
+   ```
+
+   En el Resource, añade `protected array $appendable = [];` con los accessors que pida la interfaz, y pasa a `setAppends()` sólo la intersección con esa lista, sumada a `getAppends()`. **Revisa que cada `canView()` cubra al administrador**: con `managed` forzado también le acota, y el reporte `admin_path_missing` de `larapack:fix` dice cuáles no tienen camino.
+
+6. **Activa la guardia con `verify` limpio:**
+
+   ```bash
+   php artisan larapack:verify --format=json    # ok: true
+   php artisan larapack:skill --hooks
+   ```
+
+   Antes de eso, cada edición de un archivo con errores retendría al agente por algo que no causó. Versiona `.claude/settings.json` y el bloque de `AGENTS.md` para que lo tengan todas las sesiones.
+
+**Dependencias.** En el módulo Vue, `vue-router` 5 y `pinia` 4 ya valen. Los pisos de los paquetes `innoboxrr-*` suben a las versiones que migraron a Vite 8 y Vitest 5 (`internalNpm` de `ecosystem.json`): alinéalos en `resources/<ui>/package.json` si está editado. Un paquete npm propio que siga en `vitest ^3` o `engines >=20` sale en `larapack:audit`: ver [La línea base](/ci/#node).
+
+## De 9.0 a 9.1 {#de-90-a-91}
+
+<!-- revisar tras integrar 9.1 -->
+
+**Nada cambia hasta que lo actives**: sin `.larapack/hand-rolled.lock`, `verify` trata `#[HandRolled]` como en 9.0, y el workflow y CODEOWNERS sólo se crean si se pide. Lo que trae:
+
+- **El candado de las excepciones** y `larapack:hand-rolled` para mantenerlo. Ver [Excepciones](/larapack/verificar#handrolled).
+- **`larapack:ci`**: `verify --strict` como check obligatorio de la rama, con CODEOWNERS. Ver [En la CI](/larapack/verificar#ci).
+- **El hook PreToolUse** de la guardia, que impide a un agente aprobar una excepción.
+- **Tests generados que prueban lo que cierra la autorización**: sin sesión, 401 en cada acción; con la autorización negando, 403; el listado pasa por su `ManagedFilter`. Ver [Lo que prueban los tests generados](/larapack/verificar#tests-generados).
+- **Una segunda auditoría de seguridad** de lo generado, con miles de cadenas hostiles por cada contexto donde un valor del laraimport acaba como código.
+
+Lo hace **el dueño del proyecto**, una vez:
+
+```bash
+composer require --dev innoboxrr/larapack-generator:"^9.1"
+php artisan larapack:skill --force --hooks        # añade el hook PreToolUse
+php artisan larapack:hand-rolled list             # cada excepción, «sin candado»
+php artisan larapack:hand-rolled approve --all    # crea .larapack/hand-rolled.lock
+cat .larapack/hand-rolled.lock                     # revisa objetivos y razones
+php artisan larapack:verify --strict --format=json
+php artisan larapack:ci --owner=@<dueño-o-equipo>
+git add .larapack/hand-rolled.lock .github .claude/settings.json
+```
+
+Comitea, deja que el workflow corra una vez y protege la rama con la orden que imprime `larapack:ci`. Si el proyecto corre la CI en runners propios, pásalos con `--runs-on`; sin ellos el job va a `ubuntu-latest`.
+
+Tres cosas que conviene saber antes:
+
+- **`verify --strict` tiene que salir en verde antes de exigirlo.** Si los `<Modelo>EndpointsTest` son de antes de 9.1, `verify` avisará por cada uno con `endpoint-tests-outdated` hasta que se regeneren: guarda lo que les añadiste, bórralos, vuelve a importar y pégalo de nuevo. Las pruebas nuevas pueden destapar un `authorize()` que no pregunta o un listado sin acotar: es lo que buscan.
+- **Un `controllers[]` que deja entrar a cualquiera con sesión** se declara con [`"authorize": "authenticated"`](/larapack/endpoints#authenticated) antes de regenerar: `import --force` reescribe el test de cada endpoint que nadie editó, y el nuevo espera un 403 que ese endpoint no da.
+- **Un solo candado por raíz.** El `verify` de la raíz recorre `packages/*`, así que el candado de la raíz aprueba también las excepciones de los paquetes locales. Sólo un paquete que corre `verify --strict` en su propio repositorio necesita el suyo (`--root=packages/<paquete>`).
+
+**Al regenerar** sólo cambia lo generado donde había valores raros: etiquetas de `enum` con `&` o `}` en el formulario Vue, valores de `enum` con saltos de línea y defaults como `"08"` o `"007"`. La guardia guarda su estado en otro directorio, así que el de una sesión abierta antes de actualizar se pierde.
