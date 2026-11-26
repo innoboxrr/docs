@@ -440,13 +440,11 @@ In this order:
 
 ## From 9.0 to 9.1 {#from-90-to-91}
 
-<!-- revisar tras integrar 9.1 -->
-
 **Nothing changes until you turn it on**: without `.larapack/hand-rolled.lock`, `verify` treats `#[HandRolled]` as in 9.0, and the workflow and CODEOWNERS are only created if you ask. What it brings:
 
-- **The exceptions lock** and `larapack:hand-rolled` to maintain it. See [Exceptions](/en/larapack/verify#handrolled).
-- **`larapack:ci`**: `verify --strict` as a required branch check, with CODEOWNERS. See [In CI](/en/larapack/verify#ci).
-- **The guard's PreToolUse hook**, which stops an agent from approving an exception.
+- **The exceptions lock**, with the reason and the fingerprint of the approved code, and `larapack:hand-rolled` to maintain it. See [Exceptions](/en/larapack/verify#handrolled).
+- **`larapack:ci`**: `verify --strict` as a required branch check, with CODEOWNERS and a protection command that doesn't let an administrator through either. See [In CI](/en/larapack/verify#ci).
+- **The guard's PreToolUse hook** (`Write|Edit|MultiEdit|Bash`), which stops an agent from approving or revoking an exception and from writing the lock, through any tool.
 - **Generated tests that check what closes authorization**: without a session, 401 on every action; with authorization denied, 403; the listing goes through its `ManagedFilter`. See [What the generated tests check](/en/larapack/verify#generated-tests).
 - **A second security audit** of generated code, with thousands of hostile strings for every context where a laraimport value ends up as code.
 
@@ -456,19 +454,21 @@ In this order:
 composer require --dev innoboxrr/larapack-generator:"^9.1"
 php artisan larapack:skill --force --hooks        # adds the PreToolUse hook
 php artisan larapack:hand-rolled list             # every exception, "no lock"
-php artisan larapack:hand-rolled approve --all    # creates .larapack/hand-rolled.lock
+php artisan larapack:hand-rolled approve --all    # creates .larapack/hand-rolled.lock with its fingerprints
 cat .larapack/hand-rolled.lock                     # review targets and reasons
 php artisan larapack:verify --strict --format=json
 php artisan larapack:ci --owner=@<owner-or-team>
 git add .larapack/hand-rolled.lock .github .claude/settings.json
 ```
 
-Commit, let the workflow run once and protect the branch with the command `larapack:ci` prints. If the project runs CI on its own runners, pass them with `--runs-on`; without them the job goes to `ubuntu-latest`.
+Commit, let the workflow run once and protect the branch with the command `larapack:ci` prints. If the project runs CI on its own runners, pass them with `--runs-on`; without them the job goes to `ubuntu-latest`. The command asks for `enforce_admins=true`: a direct push to the branch from an administrator account no longer gets in without the check. If the project pushed that way, it has to go through a PR, from an account other than the sole code owner's (GitHub won't let you approve your own PR).
 
 Three things worth knowing first:
 
-- **`verify --strict` must be green before you require it.** If the `<Model>EndpointsTest` files are from before 9.1, `verify` warns about each with `endpoint-tests-outdated` until they're regenerated: save what you added, delete them, import again and paste it back. The new tests may uncover an `authorize()` that doesn't ask or an unscoped listing: that's what they're for.
+- **`verify --strict` must be green before you require it.** If the `<Model>EndpointsTest` files are from before 9.1, `verify` warns about each with `endpoint-tests-outdated` until they're regenerated: save what you added, delete them, import again (without `--force` is enough) and paste it back. The new tests may uncover an `authorize()` that doesn't ask or an unscoped listing: that's what they're for.
 - **A `controllers[]` entry open to anyone signed in** is declared with [`"authorize": "authenticated"`](/en/larapack/endpoints#authenticated) before regenerating: `import --force` rewrites the test of every endpoint nobody edited, and the new one expects a 403 that endpoint doesn't give.
-- **One lock per root.** The root's `verify` goes through `packages/*`, so the root lock also approves the local packages' exceptions. Only a package that runs `verify --strict` in its own repository needs its own (`--root=packages/<package>`).
+- **One lock per root.** The root's `verify` goes through `packages/*`, so the root lock also approves the local packages' exceptions, and `larapack:audit` doesn't ask for a `verify-job` per package if the root runs `verify --strict`. Only a package that runs `verify --strict` in its own repository needs its own (`--root=packages/<package>`).
 
-**When regenerating**, generated code only changes where there were odd values: `enum` labels with `&` or `}` in the Vue form, `enum` values with line breaks, and defaults like `"08"` or `"007"`. The guard keeps its state in a different directory, so the state of a session opened before upgrading is lost.
+**When regenerating**, generated code only changes where there were odd values: `enum` labels with `&` or `}` in the Vue form, `enum` values with line breaks, and string defaults that aren't a plain decimal number. The guard keeps its state in a different directory, so the state of a session opened before upgrading is lost.
+
+**The defaults that change.** Only model `default` strings with leading zeros (`"01"`, `"007"`), an exponent (`"1e3"`) or spaces (`" 1"`): 9.0 wrote them unquoted —`->default(01)` was the integer 1— and now they're quoted. `"10.00"`, `"0.00"` and `"1.10"` still come out as `->default(10.00)`, as in 9.0. If the create migration wasn't edited, the next `larapack:import` writes an `_alter_<table>_table` with `->change()` for those columns; if it was edited, it keeps it and asks you to write the alteration. Review the alteration before migrating: `->change()` rewrites the column's whole definition, so a length or precision changed by hand in another migration is lost. Pivots have no alteration: only a new pivot's migration changes, which now uses the same literal (before, `true` came out as `'1'` and `false` as `''`).

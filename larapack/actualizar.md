@@ -440,13 +440,11 @@ En este orden:
 
 ## De 9.0 a 9.1 {#de-90-a-91}
 
-<!-- revisar tras integrar 9.1 -->
-
 **Nada cambia hasta que lo actives**: sin `.larapack/hand-rolled.lock`, `verify` trata `#[HandRolled]` como en 9.0, y el workflow y CODEOWNERS sólo se crean si se pide. Lo que trae:
 
-- **El candado de las excepciones** y `larapack:hand-rolled` para mantenerlo. Ver [Excepciones](/larapack/verificar#handrolled).
-- **`larapack:ci`**: `verify --strict` como check obligatorio de la rama, con CODEOWNERS. Ver [En la CI](/larapack/verificar#ci).
-- **El hook PreToolUse** de la guardia, que impide a un agente aprobar una excepción.
+- **El candado de las excepciones**, con la razón y la huella del código aprobado, y `larapack:hand-rolled` para mantenerlo. Ver [Excepciones](/larapack/verificar#handrolled).
+- **`larapack:ci`**: `verify --strict` como check obligatorio de la rama, con CODEOWNERS y una orden de protección que tampoco deja pasar a un administrador. Ver [En la CI](/larapack/verificar#ci).
+- **El hook PreToolUse** de la guardia (`Write|Edit|MultiEdit|Bash`), que impide a un agente aprobar o revocar una excepción y escribir el candado, por cualquier herramienta.
 - **Tests generados que prueban lo que cierra la autorización**: sin sesión, 401 en cada acción; con la autorización negando, 403; el listado pasa por su `ManagedFilter`. Ver [Lo que prueban los tests generados](/larapack/verificar#tests-generados).
 - **Una segunda auditoría de seguridad** de lo generado, con miles de cadenas hostiles por cada contexto donde un valor del laraimport acaba como código.
 
@@ -456,19 +454,21 @@ Lo hace **el dueño del proyecto**, una vez:
 composer require --dev innoboxrr/larapack-generator:"^9.1"
 php artisan larapack:skill --force --hooks        # añade el hook PreToolUse
 php artisan larapack:hand-rolled list             # cada excepción, «sin candado»
-php artisan larapack:hand-rolled approve --all    # crea .larapack/hand-rolled.lock
+php artisan larapack:hand-rolled approve --all    # crea .larapack/hand-rolled.lock con sus huellas
 cat .larapack/hand-rolled.lock                     # revisa objetivos y razones
 php artisan larapack:verify --strict --format=json
 php artisan larapack:ci --owner=@<dueño-o-equipo>
 git add .larapack/hand-rolled.lock .github .claude/settings.json
 ```
 
-Comitea, deja que el workflow corra una vez y protege la rama con la orden que imprime `larapack:ci`. Si el proyecto corre la CI en runners propios, pásalos con `--runs-on`; sin ellos el job va a `ubuntu-latest`.
+Comitea, deja que el workflow corra una vez y protege la rama con la orden que imprime `larapack:ci`. Si el proyecto corre la CI en runners propios, pásalos con `--runs-on`; sin ellos el job va a `ubuntu-latest`. La orden pide `enforce_admins=true`: un push directo a la rama con una cuenta de administración deja de entrar sin el check. Si el proyecto subía así, tiene que pasar por PR, desde una cuenta que no sea la del único dueño de código (GitHub no deja aprobar un PR propio).
 
 Tres cosas que conviene saber antes:
 
-- **`verify --strict` tiene que salir en verde antes de exigirlo.** Si los `<Modelo>EndpointsTest` son de antes de 9.1, `verify` avisará por cada uno con `endpoint-tests-outdated` hasta que se regeneren: guarda lo que les añadiste, bórralos, vuelve a importar y pégalo de nuevo. Las pruebas nuevas pueden destapar un `authorize()` que no pregunta o un listado sin acotar: es lo que buscan.
+- **`verify --strict` tiene que salir en verde antes de exigirlo.** Si los `<Modelo>EndpointsTest` son de antes de 9.1, `verify` avisará por cada uno con `endpoint-tests-outdated` hasta que se regeneren: guarda lo que les añadiste, bórralos, vuelve a importar (sin `--force` basta) y pégalo de nuevo. Las pruebas nuevas pueden destapar un `authorize()` que no pregunta o un listado sin acotar: es lo que buscan.
 - **Un `controllers[]` que deja entrar a cualquiera con sesión** se declara con [`"authorize": "authenticated"`](/larapack/endpoints#authenticated) antes de regenerar: `import --force` reescribe el test de cada endpoint que nadie editó, y el nuevo espera un 403 que ese endpoint no da.
-- **Un solo candado por raíz.** El `verify` de la raíz recorre `packages/*`, así que el candado de la raíz aprueba también las excepciones de los paquetes locales. Sólo un paquete que corre `verify --strict` en su propio repositorio necesita el suyo (`--root=packages/<paquete>`).
+- **Un solo candado por raíz.** El `verify` de la raíz recorre `packages/*`, así que el candado de la raíz aprueba también las excepciones de los paquetes locales, y `larapack:audit` no pide un job `verify-job` por paquete si la raíz corre `verify --strict`. Sólo un paquete que corre `verify --strict` en su propio repositorio necesita el suyo (`--root=packages/<paquete>`).
 
-**Al regenerar** sólo cambia lo generado donde había valores raros: etiquetas de `enum` con `&` o `}` en el formulario Vue, valores de `enum` con saltos de línea y defaults como `"08"` o `"007"`. La guardia guarda su estado en otro directorio, así que el de una sesión abierta antes de actualizar se pierde.
+**Al regenerar** sólo cambia lo generado donde había valores raros: etiquetas de `enum` con `&` o `}` en el formulario Vue, valores de `enum` con saltos de línea y defaults en cadena que no son un número decimal normal. La guardia guarda su estado en otro directorio, así que el de una sesión abierta antes de actualizar se pierde.
+
+**Los defaults que cambian.** Sólo los `default` de modelo en cadena con ceros a la izquierda (`"01"`, `"007"`), con exponente (`"1e3"`) o con espacios (`" 1"`): la 9.0 los escribía sin comillas —`->default(01)` era el entero 1— y ahora van entre comillas. `"10.00"`, `"0.00"` y `"1.10"` siguen saliendo `->default(10.00)`, como en 9.0. Si la migración de creación no se editó, el siguiente `larapack:import` escribe una `_alter_<tabla>_table` con `->change()` para esas columnas; si se editó, la conserva y pide escribir la alteración. Revisa la alteración antes de migrar: `->change()` reescribe la definición entera de la columna, así que una longitud o precisión cambiada a mano en otra migración se pierde. Los pivotes no tienen alteración: sólo cambia la migración de un pivote nuevo, que ahora usa el mismo literal (antes `true` salía `'1'` y `false`, `''`).

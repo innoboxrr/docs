@@ -32,10 +32,9 @@ No recibe el laraimport: la forma de cada modelo (sus acciones, sus endpoints, s
 | `endpoint-missing` | error | A un [endpoint declarado](/larapack/endpoints) le falta una pieza: su método, su ruta, su request, su habilidad, su operación o, con interfaz, su función en el contrato JS. |
 | `immutable-write` | error | Un camino de escritura en un modelo `immutable`, o su modelo sin la guarda que rechaza modificaciones. |
 | `secret-exposed` | error | Una columna `secret` que vuelve a salir. |
+| `endpoint-tests-outdated` | aviso | Desde 9.1. Un `<Modelo>EndpointsTest` de antes de 9.1 al que le falta alguna de las pruebas que cierran la autorización —la del `ManagedFilter`, sólo si el modelo tiene listado—. Ver [Lo que prueban los tests generados](#tests-generados). |
 
-<!-- revisar tras integrar 9.1 -->
-
-LaraPack 9.1 añade además `endpoint-tests-outdated` (aviso): un `<Modelo>EndpointsTest` de antes de 9.1, sin las pruebas que cierran la autorización (ver [Lo que prueban los tests generados](#tests-generados)). Ese test no está en el manifiesto ni se regenera, así que el mensaje dice cómo traerlas: guardar lo añadido, borrarlo, `larapack:import` y volver a pegarlo. Como es aviso, con `--strict` pone `verify` en rojo hasta que se haga.
+`endpoint-tests-outdated` sale una vez por modelo. Ese test se crea una vez y no se regenera nunca: no está en el manifiesto, así que no hay hash con el que saber si alguien lo editó. Por eso el mensaje dice cómo traer las pruebas: guardar lo añadido, borrarlo, `larapack:import` (sin `--force` basta: crea el que falta) y volver a pegarlo. Como es aviso, con `--strict` pone `verify` en rojo hasta que se haga. `larapack:fix` no lo arregla: sin hash no hay forma segura de saber que el archivo es el generado.
 
 ### Sobre todo el código {#controladores}
 
@@ -108,7 +107,7 @@ class StripeWebhookController extends Controller { ... }
 
 **En 9.0**, `verify` la lista como aviso en cada ejecución, y con `--strict` falla.
 
-**Desde 9.1, la aprobación es un archivo**: `.larapack/hand-rolled.lock`, una lista JSON de `{target, reason}`, ordenada y estable byte a byte, que el dueño mantiene con [`larapack:hand-rolled`](/larapack/comandos#larapack-hand-rolled) y comitea. `target` es `Clase` o `Clase::metodo`, con el nombre completo.
+**Desde 9.1, la aprobación es un archivo**: `.larapack/hand-rolled.lock`, una lista JSON de `{target, reason, fingerprint}`, ordenada y estable byte a byte, que el dueño mantiene con [`larapack:hand-rolled`](/larapack/comandos#larapack-hand-rolled) y comitea. `target` es `Clase` o `Clase::metodo`, con el nombre completo.
 
 ```bash
 php artisan larapack:hand-rolled list                            # cada excepción y su estado
@@ -117,22 +116,22 @@ php artisan larapack:hand-rolled approve TokenController::store  # basta el fina
 php artisan larapack:hand-rolled revoke StripeWebhookController
 ```
 
-<!-- revisar tras integrar 9.1 -->
+`fingerprint` es la huella del código aprobado —sha256 de sus tokens, sin espacios ni comentarios—: de un método, su firma y su cuerpo; de una clase, todos sus métodos, su padre y sus traits. Cambiar la razón, añadir una acción a una clase aprobada, o cambiar una sentencia o un parámetro deja la excepción sin aprobar, y el diff del candado que la vuelve a aprobar es lo que se revisa. Reformatear o comentar no la cambia, y lo que el código aprobado llama fuera de la clase —otra clase, el cuerpo de un trait— no entra en la huella. Aprobar un nombre a secas sería un cheque en blanco: la clase cubriría cada acción que se le añadiera después.
 
-El candado guarda la razón junto al objetivo, y en 9.1 también una huella del código aprobado: cambiar la razón, añadir una acción a una clase aprobada o cambiar una sentencia deja la excepción sin aprobar, y el diff del candado que la vuelve a aprobar es lo que se revisa. Aprobar un nombre a secas sería un cheque en blanco: la clase cubriría cada acción que se le añadiera después.
+`approve` recalcula la huella y `list` marca `code-changed` lo que cambió desde que se aprobó. Basta el final del nombre que lo distinga; si coincide con más de uno, no se adivina y no se cambia nada.
 
 | Comprobación | Sin candado | Con candado |
 |---|---|---|
 | `hand-rolled` | aviso: `--strict` falla | info si está aprobada: `--strict` pasa |
-| `hand-rolled-unapproved` | — | error: no está en el candado, o cambió lo aprobado. También un candado ilegible, que deja todo sin aprobar |
+| `hand-rolled-unapproved` | — | error: no está en el candado, cambió la razón o cambió el código (la huella no coincide). También una entrada sin huella, y un candado ilegible, que deja todo sin aprobar |
 | `hand-rolled-stale` | — | aviso: el candado aprueba algo que ya no lleva `#[HandRolled]`; se retira con `revoke` |
 
-Sin candado, un proyecto en 9.1 se comporta como en 9.0: nada cambia hasta que el dueño lo crea. El candado es de la raíz sobre la que corre `verify`: un paquete que corre `verify --strict` en su propio repositorio lleva el suyo.
+Sin candado, un proyecto en 9.1 se comporta como en 9.0: nada cambia hasta que el dueño lo crea. Sin candado y sin excepciones en el código, `approve --all` no crea uno vacío: el candado cambia el modo de `verify` (un `#[HandRolled]` nuevo pasa de aviso a error), y eso no ocurre de rebote. El candado es de la raíz sobre la que corre `verify`: en un monorepo, el de la raíz aprueba también las excepciones de `packages/*`, que su `verify` recorre. Sólo un paquete que corre `verify --strict` en su propio repositorio lleva el suyo.
 
 **Quién toca el candado lo deciden dos cosas**, y ninguna depende de que alguien se acuerde:
 
 - **CODEOWNERS y la rama protegida.** `larapack:ci --owner=@equipo` pone el candado, el workflow y el propio CODEOWNERS bajo la revisión del dueño. Ver [En la CI](#ci).
-- **La guardia, para los agentes.** El hook de `larapack:guard --pre` bloquea la edición del candado y las órdenes que corren `approve` o `revoke`. No es infranqueable —un agente puede escribir el archivo por otra vía—: la barrera real es la revisión del dueño. Ver [Desarrollo con IA](/ia/#guardia).
+- **La guardia, para los agentes.** El hook de `larapack:guard --pre` (PreToolUse sobre `Write|Edit|MultiEdit|Bash`) bloquea la edición del candado, las órdenes que corren `approve` o `revoke` —también por alias, abreviatura, con la palabra partida por comillas o dentro de `bash -c` y `eval`— y las que escriben el candado sin el comando: una redirección, `tee`, `cp`, `mv`, `sed -i`, el código en línea de `php -r` o `python -c`… Leerlo (`cat`, `git diff`) no. No es infranqueable —una variable, un glob o un script propio escriben el archivo por otra vía—: la barrera real es la revisión del dueño. Ver [Desarrollo con IA](/ia/#guardia).
 
 ### Arreglar lo viejo: `larapack:fix` {#fix}
 
@@ -165,7 +164,7 @@ Además reporta dos cosas **sin arreglarlas**, que no cambian el código de sali
 | `test_<modelo>_cada_accion_pregunta_a_la_politica` | Un `authorize()` que no pregunta: con sesión y la autorización negando, cada acción da 403. |
 | `test_<modelo>_index_pasa_por_su_managed_filter` | Un listado sin acotar: un `IndexRequest` que no fuerza `managed`, o un `ManagedFilter` que SearchSurge no encuentra. |
 
-El test de cada endpoint declarado gana lo mismo: 403 con sesión y la autorización negando, también en los públicos y en los `controllers[]`. Qué deja ver tu `canView()` y qué decide tu política son huecos: se prueban en tests tuyos, con los usuarios de tu dominio.
+El test de cada endpoint declarado gana lo mismo (`test_con_sesion_pregunta_a_la_autorizacion`): 403 con sesión y la autorización negando, también en los públicos y en los `controllers[]`. La excepción es un `controllers[]` declarado con [`"authorize": "authenticated"`](/larapack/endpoints#authenticated): su test es `test_con_sesion_basta_la_sesion`, que con la autorización negando espera cualquier cosa menos 403. Qué deja ver tu `canView()` y qué decide tu política son huecos: se prueban en tests tuyos, con los usuarios de tu dominio.
 
 ### Qué hacer con el resultado
 
@@ -182,20 +181,18 @@ php artisan larapack:ci --dry-run
 php artisan larapack:ci --owner=@acme/arquitectura
 ```
 
-1. **Crea `.github/workflows/larapack.yml`** con un job, **«LaraPack verify»**, que corre `larapack:verify --strict --format=json` en cada `pull_request` y en cada `push` a la rama por defecto. Elige el PHP de `config.platform.php` o el mínimo con el que se instala `composer.lock`, y las `ext-*` del `composer.json`. No edita ningún otro workflow, y si el suyo difiere no lo pisa sin `--force`: enseña el diff y sale con 1.
+1. **Crea `.github/workflows/larapack.yml`** con un job, **«LaraPack verify»**, que corre `larapack:verify --strict --format=json` en cada `pull_request` y en cada `push` a la rama por defecto. Elige el PHP de `config.platform.php` o el mínimo con el que se instala `composer.lock`, y las `ext-*` del `composer.json`. No edita ningún otro workflow, y si el suyo difiere no lo pisa sin `--force`: enseña el diff, no escribe nada —tampoco CODEOWNERS, que enseña como «añadiría»— y sale con 1.
 2. **Con `--owner`** (repetible) fusiona en CODEOWNERS el candado, el workflow y el propio CODEOWNERS, sin duplicar ni tocar líneas ajenas. Sin `--owner` no inventa un dueño.
-3. **Imprime lo que no puede hacer**: proteger la rama exigiendo el check y la revisión de los dueños de código (*Require review from Code Owners*), con la orden `gh api --method PUT …/branches/<rama>/protection` para que la corra el dueño. Nunca la ejecuta.
+3. **Imprime lo que no puede hacer**: proteger la rama exigiendo el check y la revisión de los dueños de código (*Require review from Code Owners*), con la orden `gh api --method PUT 'repos/<dueño>/<repo>/branches/<rama>/protection'` para que la corra el dueño. Nunca la ejecuta. Cada argumento va entre comillas simples, para que se pegue igual en bash, zsh y PowerShell. La rama sale del remoto: si no se sabe o tiene caracteres de shell, la orden lleva `RAMA` en su lugar y lo avisa.
 
 El nombre del job es el nombre del check: si alguien lo cambia, la protección espera un check que ya no llega y bloquea todo. El check sólo se puede exigir cuando GitHub ya lo vio, así que primero se comitea y se deja correr una vez.
 
-<!-- revisar tras integrar 9.1 -->
+Dos opciones para que la puerta no tenga puerta trasera:
 
-Dos ajustes de 9.1 para que la puerta no tenga puerta trasera:
+- **Que tampoco un administrador se la salte.** Con `enforce_admins` en `false`, quien empuja como administrador pasa sin el check ni la revisión, y GitHub sólo lo anota: es el caso de un orquestador que sube a la rama con la cuenta del dueño. La orden que imprime `larapack:ci` lo pide en `true` (`--enforce-admins`, de fábrica), y `--no-enforce-admins` lo deja en `false` avisando. El precio es que GitHub no deja aprobar un PR propio: los PR del agente tienen que salir de una cuenta que no sea la del único dueño de código.
+- **Los runners del proyecto.** `--runs-on` (repetible, `--runs-on=self-hosted --runs-on=linux`, o una lista JSON, `--runs-on='["self-hosted","linux"]'`) pone el job en los runners que ya usa el proyecto. Sin ella va a `ubuntu-latest`, y si otros workflows corren en otro sitio, lo dice con la opción ya escrita. Un job que no arranca deja el check exigido sin llegar y nada se fusiona; y en un monorepo donde `verify` tarda minutos, el runner alojado los cobra en cada PR.
 
-- **Que tampoco un administrador se la salte.** Con `enforce_admins` en `false`, quien empuja como administrador pasa sin el check ni la revisión, y GitHub sólo lo anota: es el caso de un orquestador que sube a la rama con la cuenta del dueño. La orden que imprime `larapack:ci` lo pide en `true`, y `--no-enforce-admins` lo quita avisando. El precio es que GitHub no deja aprobar un PR propio: los PR del agente tienen que salir de una cuenta que no sea la del único dueño de código.
-- **Los runners del proyecto.** `--runs-on` (repetible, o una lista JSON) pone el job en los runners que ya usa el proyecto. Un job que no arranca deja el check exigido sin llegar y nada se fusiona; y en un monorepo donde `verify` tarda minutos, el runner alojado los cobra en cada PR.
-
-Un paquete creado con `larapack:new` trae el mismo job en su `tests.yml`, y `larapack:audit` avisa con `verify-job` cuando la CI de un paquete que usa LaraPack no corre `verify --strict`. Ver [Los workflows](/ci/workflows#verify).
+Un paquete creado con `larapack:new` trae el mismo job en su `tests.yml`, y `larapack:audit` avisa con `verify-job` cuando la CI de un paquete que usa LaraPack no corre `verify --strict`. Un paquete en `packages/` de un repositorio cuya raíz ya corre `verify --strict` no avisa: el `verify` de la raíz lo recorre con un solo candado. Ver [Los workflows](/ci/workflows#verify).
 
 ## larapack:audit {#audit}
 

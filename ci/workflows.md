@@ -309,15 +309,17 @@ En un proyecto que ya existe —una aplicación o un paquete creado antes de 9.1
 aplicación con `php artisan`, con el PHP de `config.platform.php` o el mínimo con
 el que se instala `composer.lock`, y con `pull_request` y `push` a la rama por
 defecto. Con `--owner` añade CODEOWNERS, e imprime la orden que protege la rama
-para que la corra el dueño. `larapack:audit` avisa con `verify-job` a un paquete
-que usa LaraPack sin este trabajo. El porqué y los pasos están en
-[En la CI](/larapack/verificar#ci).
-
-<!-- revisar tras integrar 9.1 -->
+para que la corra el dueño, con `enforce_admins=true` salvo `--no-enforce-admins`.
+Si el workflow ya existe y difiere, no escribe nada sin `--force`. `larapack:audit`
+avisa con `verify-job` a un paquete que usa LaraPack sin este trabajo. El porqué y
+los pasos están en [En la CI](/larapack/verificar#ci).
 
 Si el proyecto corre sus workflows en runners propios, `larapack:ci --runs-on`
-pone el job ahí: un job que no arranca deja el check exigido sin llegar, y nada se
-fusiona.
+(repetible, o una lista JSON) pone el job ahí; sin ella va a `ubuntu-latest`. Un
+job que no arranca deja el check exigido sin llegar, y nada se fusiona.
+
+En un monorepo basta el job de la raíz: su `verify` recorre `packages/*` con un
+solo candado, y los paquetes de `packages/` no necesitan el suyo.
 
 ### `frontend`: las interfaces de la aplicación base
 

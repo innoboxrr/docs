@@ -263,7 +263,7 @@ You don't run it by hand: the hooks `larapack:skill --hooks` installs run it. It
 |---|---|
 | (none) | After an edit. If the file is a controller, a request, a route, a policy, a migration or something generated that isn't a slot, it runs `verify`'s checks on it. |
 | `--stop` | At the end of the turn. It verifies the whole project and only holds back for errors in what the session touched. |
-| `--pre` | Before the tool (since 9.1). It prevents editing `.larapack/hand-rolled.lock` and running `larapack:hand-rolled approve` or `revoke`. |
+| `--pre` | Before the tool (since 9.1). It prevents editing `.larapack/hand-rolled.lock`, writing it from Bash (a redirection, `tee`, `cp`, `sed -i`…) and running `larapack:hand-rolled approve` or `revoke`. |
 | `--root=` | The project root; by default, the touched file's. |
 
 | Code | What Claude Code does |
@@ -292,11 +292,7 @@ php artisan larapack:hand-rolled revoke 'App\Http\Controllers\StripeWebhookContr
 | `--all` | With `approve`: approves every exception in the code. |
 | `--root=`, `--format=` | The [common options](#common-options). |
 
-`list` gives each exception's state: `approved`, `unapproved`, `reason-changed`, `stale` (in the lock and no longer in the code) or `no-lock`. `approve` and `revoke` write `.larapack/hand-rolled.lock`; approving means running the command, reviewing the lock diff and committing it. See [Exceptions](/en/larapack/verify#handrolled).
-
-<!-- revisar tras integrar 9.1 -->
-
-In 9.1 the lock also stores a fingerprint of the approved code: `approve` recomputes it, and `list` flags what changed since it was approved.
+`list` gives each exception's state: `approved`, `unapproved`, `reason-changed`, `code-changed` (the code's fingerprint no longer matches the approved one), `stale` (in the lock and no longer in the code) or `no-lock`. `approve` and `revoke` write `.larapack/hand-rolled.lock`, with `target`, `reason` and `fingerprint` per entry; `approve` recomputes the fingerprint. Approving means running the command, reviewing the lock diff and committing it. See [Exceptions](/en/larapack/verify#handrolled).
 
 ## larapack:ci {#larapack-ci}
 
@@ -312,13 +308,11 @@ php artisan larapack:ci --owner=@acme/architecture
 | `--owner=` | Owner in CODEOWNERS: `@user`, `@org/team` or an email. Repeatable. Without it, CODEOWNERS isn't touched. |
 | `--dry-run` | Shows the workflow diff and the CODEOWNERS lines without writing anything. |
 | `--force` | Overwrites `.github/workflows/larapack.yml` even if it differs. |
+| `--runs-on=` | Runner label, repeatable (`--runs-on=self-hosted --runs-on=linux`), or a JSON list (`--runs-on='["self-hosted","linux"]'`). Without it, `ubuntu-latest`. |
+| `--enforce-admins`, `--no-enforce-admins` | In the protection command, `enforce_admins`: `true` by default, so not even an administrator skips the check; `--no-enforce-admins` sets it to `false` and the output warns. |
 | `--root=` | The [common options](#common-options). |
 
-It creates `.github/workflows/larapack.yml` with the "LaraPack verify" job, merges CODEOWNERS and prints the command that protects the branch, without running it. If the workflow already exists and differs, it shows the diff and exits with 1. It has no `--format`. See [In CI](/en/larapack/verify#ci).
-
-<!-- revisar tras integrar 9.1 -->
-
-The sessions closing 9.1 add `--runs-on` (the runner labels, repeatable or as a JSON list; without it, `ubuntu-latest`) and `--no-enforce-admins` (by default the protection command asks that not even an administrator skip the check).
+It creates `.github/workflows/larapack.yml` with the "LaraPack verify" job, merges CODEOWNERS and prints the command that protects the branch, with every argument in single quotes, without running it. If the workflow already exists and differs, it shows the diff, writes nothing —not CODEOWNERS either— and exits with 1. It has no `--format`. See [In CI](/en/larapack/verify#ci).
 
 ## larapack:full-model {#larapack-full-model}
 

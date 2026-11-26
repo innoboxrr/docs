@@ -185,11 +185,10 @@ Dónde mira cada una:
   `larapack:verify --strict` en sus workflows. Con `larapack:audit --strict` en la
   CI, el aviso la pone en rojo hasta que el job exista.
 
-<!-- revisar tras integrar 9.1 -->
-
 En un monorepo, un paquete de `packages/` cuya raíz ya corre `verify --strict` no
-necesita su propio job: el `verify` de la raíz recorre `packages/*`. La 9.1 deja de
-avisar en ese caso.
+necesita su propio job, y `verify-job` no avisa: el `verify` de la raíz recorre
+`packages/*` con un solo candado. Si la raíz no lo corre, el aviso pide el job en la
+raíz (`larapack:ci` allí), no un `larapack.yml` por paquete.
 
 ### Paquetes npm
 

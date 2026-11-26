@@ -263,7 +263,7 @@ No se corre a mano: lo ejecutan los hooks que instala `larapack:skill --hooks`. 
 |---|---|
 | (ninguna) | Tras editar. Si el archivo es un controlador, una request, una ruta, una política, una migración o algo generado que no es un hueco, le pasa las comprobaciones de `verify`. |
 | `--stop` | Al terminar el turno. Verifica el proyecto entero y retiene sólo por los errores de lo que tocó la sesión. |
-| `--pre` | Antes de la herramienta (desde 9.1). Impide editar `.larapack/hand-rolled.lock` y correr `larapack:hand-rolled approve` o `revoke`. |
+| `--pre` | Antes de la herramienta (desde 9.1). Impide editar `.larapack/hand-rolled.lock`, escribirlo desde Bash (una redirección, `tee`, `cp`, `sed -i`…) y correr `larapack:hand-rolled approve` o `revoke`. |
 | `--root=` | La raíz del proyecto; por omisión, la del archivo tocado. |
 
 | Código | Qué hace Claude Code |
@@ -292,11 +292,7 @@ php artisan larapack:hand-rolled revoke 'App\Http\Controllers\StripeWebhookContr
 | `--all` | Con `approve`: aprueba todas las excepciones del código. |
 | `--root=`, `--format=` | Las [opciones comunes](#opciones-comunes). |
 
-`list` da el estado de cada excepción: `approved`, `unapproved`, `reason-changed`, `stale` (en el candado y ya no en el código) o `no-lock`. `approve` y `revoke` escriben `.larapack/hand-rolled.lock`; aprobar es correr el comando, revisar el diff del candado y comitearlo. Ver [Excepciones](/larapack/verificar#handrolled).
-
-<!-- revisar tras integrar 9.1 -->
-
-En 9.1 el candado guarda también una huella del código aprobado: `approve` la recalcula, y `list` marca lo que cambió desde que se aprobó.
+`list` da el estado de cada excepción: `approved`, `unapproved`, `reason-changed`, `code-changed` (la huella del código ya no coincide con la aprobada), `stale` (en el candado y ya no en el código) o `no-lock`. `approve` y `revoke` escriben `.larapack/hand-rolled.lock`, con `target`, `reason` y `fingerprint` por entrada; `approve` recalcula la huella. Aprobar es correr el comando, revisar el diff del candado y comitearlo. Ver [Excepciones](/larapack/verificar#handrolled).
 
 ## larapack:ci {#larapack-ci}
 
@@ -312,13 +308,11 @@ php artisan larapack:ci --owner=@acme/arquitectura
 | `--owner=` | Dueño en CODEOWNERS: `@usuario`, `@organización/equipo` o un correo. Repetible. Sin ella no se toca CODEOWNERS. |
 | `--dry-run` | Enseña el diff del workflow y las líneas de CODEOWNERS sin escribir nada. |
 | `--force` | Sobrescribe `.github/workflows/larapack.yml` aunque difiera. |
+| `--runs-on=` | Etiqueta del runner, repetible (`--runs-on=self-hosted --runs-on=linux`), o una lista JSON (`--runs-on='["self-hosted","linux"]'`). Sin ella, `ubuntu-latest`. |
+| `--enforce-admins`, `--no-enforce-admins` | En la orden de protección, `enforce_admins`: `true` de fábrica, para que tampoco un administrador se salte el check; `--no-enforce-admins` lo pone en `false` y la salida avisa. |
 | `--root=` | Las [opciones comunes](#opciones-comunes). |
 
-Crea `.github/workflows/larapack.yml` con el job «LaraPack verify», fusiona CODEOWNERS e imprime la orden que protege la rama, sin ejecutarla. Si el workflow ya existe y difiere, enseña el diff y sale con 1. No tiene `--format`. Ver [En la CI](/larapack/verificar#ci).
-
-<!-- revisar tras integrar 9.1 -->
-
-Las consolas que cierran la 9.1 añaden `--runs-on` (las etiquetas del runner, repetible o como lista JSON; sin ella, `ubuntu-latest`) y `--no-enforce-admins` (la orden de protección pide por omisión que tampoco un administrador se salte el check).
+Crea `.github/workflows/larapack.yml` con el job «LaraPack verify», fusiona CODEOWNERS e imprime la orden que protege la rama, con cada argumento entre comillas simples, sin ejecutarla. Si el workflow ya existe y difiere, enseña el diff, no escribe nada —tampoco CODEOWNERS— y sale con 1. No tiene `--format`. Ver [En la CI](/larapack/verificar#ci).
 
 ## larapack:full-model {#larapack-full-model}
 

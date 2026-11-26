@@ -61,12 +61,11 @@ Sin ninguna de las dos se genera exactamente lo mismo que antes.
 | `ability` | `name` | En un modelo, la habilidad de su política; una CRUD (`update`, `view`…) reutiliza su método. En un `controllers[]`, una habilidad de Gate; sin ella, `authorize()` nace en `false`. |
 | `public` | `false` | Sin sesión: el controlador quita `auth:sanctum` sólo para ese método. La autorización se sigue preguntando, con `?User`. Acompáñalo de un `throttle:`. |
 | `middleware` | `[]` | Middleware de la ruta, además del grupo `api`. Sin espacios. |
+| `authorize` | — | Sólo en `controllers[]`, y sólo con el valor `authenticated`: basta la sesión. Ver [abajo](#authenticated). |
 
 ### «Cualquiera con sesión» en un `controllers[]` {#authenticated}
 
-<!-- revisar tras integrar 9.1 -->
-
-Un endpoint sin modelo abierto a cualquiera con sesión —o cuya `authorize()` decide sin Gate, dejando a `rules()` el 422 y respondiendo 404 por lo ajeno— se declara en LaraPack 9.1 con `"authorize": "authenticated"`, sin `ability` ni `public`:
+Un endpoint sin modelo abierto a cualquiera con sesión —o cuya `authorize()` decide sin Gate, dejando a `rules()` el 422 y respondiendo 404 por lo ajeno— se declara desde LaraPack 9.1 con `"authorize": "authenticated"`. No admite `ability` (no se preguntaría a ningún Gate) ni `public` (no habría sesión): `larapack:validate` rechaza las dos combinaciones.
 
 ```json
 { "name": "Desk", "endpoints": [
@@ -74,7 +73,7 @@ Un endpoint sin modelo abierto a cualquiera con sesión —o cuya `authorize()` 
 ] }
 ```
 
-Su `authorize()` nace en `true`, y su test comprueba que con la autorización negando **no** responde 403 (sigue pidiendo sesión: sin ella, 401). Sin declararlo, el test generado que espera ese 403 fallaría, y con razón. En un endpoint de modelo no existe: ahí «cualquiera con sesión» es el método de la política devolviendo `true`.
+Su `authorize()` nace en `true`, y su test pasa a ser `test_con_sesion_basta_la_sesion`: con la autorización negando espera cualquier cosa menos 403 (sigue pidiendo sesión: sin ella, 401). Sin declararlo, `test_con_sesion_pregunta_a_la_autorizacion` espera ese 403 y fallaría siempre. En un endpoint de modelo no existe y el esquema lo rechaza: ahí «cualquiera con sesión» es el método de la política devolviendo `true`, y el test, que niega antes de consultar la política, sigue pasando.
 
 ## Qué se genera
 
@@ -87,7 +86,7 @@ Todo determinista a partir de la declaración. Lo que se escribe a mano va sólo
 | `Http/Requests/<Modelo>/<Name>Request.php` | `authorize()` pregunta a la política; `rules()` lleva `<modelo>_id` si es `record` y el identificador no va en la URI; `handle()` busca el registro y delega en `$modelo-><name>Model($this)`. | Sí: `rules()` y lo que necesiten `authorize()` y `handle()`. |
 | Método de la política | `publish(User $user, Course $course)`, que **nace devolviendo `false`**. `collection` no recibe el modelo; `public` recibe `?User`. | Sí. |
 | `<name>Model($request)` en `Traits/Operations` | Lanza `LogicException` hasta que se escriba. Sólo cuando se crea el trait: uno que ya existe no se toca, y `verify` dice el nombre exacto que falta. | Sí. Aquí va la lógica. |
-| `tests/Feature/Endpoints/<Modelo>/<Name>Test.php` | Sin sesión, 401 (o 403 si es público: nace cerrado); con sesión y la autorización negando, 403. | Sí. |
+| `tests/Feature/Endpoints/<Modelo>/<Name>Test.php` | Sin sesión, 401 (o 403 si es público: nace cerrado); con sesión y la autorización negando, 403 (`test_con_sesion_pregunta_a_la_autorizacion`). Con `authorize: authenticated`, cualquier cosa menos 403 (`test_con_sesion_basta_la_sesion`). | Sí. |
 
 Un `controllers[]` genera lo mismo salvo política y operación: su controlador, su archivo de rutas en `routes/api/models/<nombre>.php` —el directorio que el `RouteServiceProvider` ya carga, así que no hay que regenerar el proveedor—, sus requests y sus tests. `handle()` nace como `abort(501)`: la lógica va en una clase de soporte, no en la request ni en el controlador.
 

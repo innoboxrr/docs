@@ -306,15 +306,19 @@ In an existing project —an application, or a package created before 9.1—,
 application with `php artisan`, with the PHP from `config.platform.php` or the
 minimum `composer.lock` installs with, and with `pull_request` and `push` to the
 default branch. With `--owner` it adds CODEOWNERS, and it prints the command that
-protects the branch for the owner to run. `larapack:audit` warns with `verify-job`
-a package that uses LaraPack without this job. The why and the steps are in
+protects the branch for the owner to run, with `enforce_admins=true` unless
+`--no-enforce-admins`. If the workflow already exists and differs, it writes nothing
+without `--force`. `larapack:audit` warns with `verify-job` a package that uses
+LaraPack without this job. The why and the steps are in
 [In CI](/en/larapack/verify#ci).
 
-<!-- revisar tras integrar 9.1 -->
-
-If the project runs its workflows on its own runners, `larapack:ci --runs-on` puts
-the job there: a job that never starts leaves the required check pending, and
+If the project runs its workflows on its own runners, `larapack:ci --runs-on`
+(repeatable, or a JSON list) puts the job there; without it, it goes to
+`ubuntu-latest`. A job that never starts leaves the required check pending, and
 nothing merges.
+
+In a monorepo the root's job is enough: its `verify` goes through `packages/*` with
+a single lock, and the packages under `packages/` don't need their own.
 
 ### `frontend`: the base application's interfaces
 

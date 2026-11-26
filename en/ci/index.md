@@ -184,11 +184,10 @@ Where each one looks:
   workflows for `larapack:verify --strict`. With `larapack:audit --strict` in CI,
   the warning turns it red until the job exists.
 
-<!-- revisar tras integrar 9.1 -->
-
 In a monorepo, a package under `packages/` whose root already runs `verify --strict`
-doesn't need its own job: the root's `verify` goes through `packages/*`. 9.1 stops
-warning in that case.
+doesn't need its own job, and `verify-job` doesn't warn: the root's `verify` goes
+through `packages/*` with a single lock. If the root doesn't run it, the warning asks
+for the job at the root (`larapack:ci` there), not a `larapack.yml` per package.
 
 ### npm packages
 

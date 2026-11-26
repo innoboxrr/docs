@@ -61,12 +61,11 @@ Without either of them, exactly the same is generated as before.
 | `ability` | `name` | On a model, the ability on its policy; a CRUD one (`update`, `view`…) reuses its method. In `controllers[]`, a Gate ability; without one, `authorize()` starts out returning `false`. |
 | `public` | `false` | No session: the controller drops `auth:sanctum` for that method only. Authorization is still asked, with `?User`. Pair it with a `throttle:`. |
 | `middleware` | `[]` | Route middleware, on top of the `api` group. No spaces. |
+| `authorize` | — | Only in `controllers[]`, and only with the value `authenticated`: a session is enough. See [below](#authenticated). |
 
 ### "Anyone signed in" on a `controllers[]` endpoint {#authenticated}
 
-<!-- revisar tras integrar 9.1 -->
-
-A model-less endpoint open to anyone with a session —or whose `authorize()` decides without Gate, leaving the 422 to `rules()` and answering 404 for what isn't yours— is declared in LaraPack 9.1 with `"authorize": "authenticated"`, without `ability` or `public`:
+A model-less endpoint open to anyone with a session —or whose `authorize()` decides without Gate, leaving the 422 to `rules()` and answering 404 for what isn't yours— is declared since LaraPack 9.1 with `"authorize": "authenticated"`. It doesn't accept `ability` (no Gate would be asked) or `public` (there would be no session): `larapack:validate` rejects both combinations.
 
 ```json
 { "name": "Desk", "endpoints": [
@@ -74,7 +73,7 @@ A model-less endpoint open to anyone with a session —or whose `authorize()` de
 ] }
 ```
 
-Its `authorize()` starts out returning `true`, and its test checks that with authorization denied it does **not** answer 403 (it still requires a session: without one, 401). Without declaring it, the generated test that expects that 403 would fail, and rightly so. It doesn't exist on a model endpoint: there, "anyone signed in" is the policy method returning `true`.
+Its `authorize()` starts out returning `true`, and its test becomes `test_con_sesion_basta_la_sesion`: with authorization denied it expects anything but 403 (it still requires a session: without one, 401). Without declaring it, `test_con_sesion_pregunta_a_la_autorizacion` expects that 403 and would always fail. It doesn't exist on a model endpoint and the schema rejects it: there, "anyone signed in" is the policy method returning `true`, and the test, which denies before asking the policy, still passes.
 
 ## What is generated
 
@@ -87,7 +86,7 @@ All deterministic, from the declaration. What you write by hand goes only in the
 | `Http/Requests/<Model>/<Name>Request.php` | `authorize()` asks the policy; `rules()` carries `<model>_id` if it's `record` and the identifier isn't in the URI; `handle()` looks up the record and delegates to `$model-><name>Model($this)`. | Yes: `rules()` and whatever `authorize()` and `handle()` need. |
 | Policy method | `publish(User $user, Course $course)`, which **starts out returning `false`**. `collection` doesn't receive the model; `public` receives `?User`. | Yes. |
 | `<name>Model($request)` in `Traits/Operations` | Throws `LogicException` until it's written. Only when the trait is created: an existing one is left alone, and `verify` tells you the exact name that's missing. | Yes. Your logic goes here. |
-| `tests/Feature/Endpoints/<Model>/<Name>Test.php` | Without a session, 401 (or 403 if public: it starts closed); with a session and authorization denied, 403. | Yes. |
+| `tests/Feature/Endpoints/<Model>/<Name>Test.php` | Without a session, 401 (or 403 if public: it starts closed); with a session and authorization denied, 403 (`test_con_sesion_pregunta_a_la_autorizacion`). With `authorize: authenticated`, anything but 403 (`test_con_sesion_basta_la_sesion`). | Yes. |
 
 A `controllers[]` entry generates the same minus the policy and the operation: its controller, its routes file in `routes/api/models/<name>.php` —the directory the `RouteServiceProvider` already loads, so no provider needs regenerating—, its requests and its tests. `handle()` starts as `abort(501)`: the logic goes in a support class, not in the request or the controller.
 

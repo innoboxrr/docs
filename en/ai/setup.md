@@ -201,7 +201,7 @@ They read `AGENTS.md`. There are two ways to give it to them:
 |---|---|---|---|
 | PostToolUse | `Write\|Edit\|MultiEdit` | `larapack:guard` | If the edited file is a controller, a request, a route, a policy, a migration or something generated that isn't an extension point, it runs `verify`'s checks on it. With errors in that file it exits with 2: Claude Code blocks and hands the model the reason and the rule. |
 | Stop | — | `larapack:guard --stop` | Verifies the project at the end of the turn. It only holds back for errors in what the session touched; the rest it reports without blocking. |
-| PreToolUse (9.1) | `Write\|Edit\|MultiEdit\|Bash` | `larapack:guard --pre` | Prevents editing `.larapack/hand-rolled.lock` and running `larapack:hand-rolled approve` or `revoke`, also through an alias, an abbreviation or inside `bash -c`. It reads the command the way the shell would, without running it, and only wakes PHP if the input contains `approve`, `revoke` or `hand-rolled`. |
+| PreToolUse (9.1) | `Write\|Edit\|MultiEdit\|Bash` | `larapack:guard --pre` | Prevents editing `.larapack/hand-rolled.lock`, writing it from Bash (a redirection, `tee`, `cp`, `sed -i`…) and running `larapack:hand-rolled approve` or `revoke`, also through an alias, an abbreviation or inside `bash -c`. It reads the command the way the shell would, without running it, and only wakes PHP if the input contains `approve`, `revoke` or `hand-rolled`. |
 
 The command uses `$CLAUDE_PROJECT_DIR`, which needs a shell that expands variables
 (on Windows, Git Bash), and does nothing while `vendor/` doesn't exist. Commit
