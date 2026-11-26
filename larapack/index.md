@@ -21,7 +21,7 @@ Si falta un endpoint, un campo o una pantalla, falta en el `laraimport.json` o e
 | Comando | Qué comprueba | Cuándo |
 |---|---|---|
 | `larapack:validate` | Que `laraimport.json` es válido contra el esquema y coherente como documento. | Antes de generar. `larapack:import` ejecuta la misma validación y no escribe nada si falla. |
-| `larapack:verify` | Que lo generado sigue en su sitio y dice lo mismo que el contrato. | Después de generar y de escribir la lógica, y en la CI. |
+| `larapack:verify` | Que lo generado sigue en su sitio y dice lo mismo que el contrato, y que ningún controlador del proyecto, generado o no, hace más que `return $request->handle();`. | Después de generar y de escribir la lógica, en cada edición de un agente con la [guardia](/ia/#guardia), y en la CI como check obligatorio de la rama. |
 | `larapack:audit` | Que el paquete cumple la línea base del ecosistema: versiones, tests y workflows de publicación. | En la CI de cada paquete, antes de publicar. |
 
 Las tres salen con código distinto de cero cuando algo falla, y con `--format=json` escriben un único documento JSON. Por eso un agente puede iterar sin preguntar: ver [El ciclo del agente](/ia/ciclo).
@@ -111,9 +111,10 @@ Los pasos para empezar un proyecto están en [Un paquete nuevo](/empezar/paquete
 | [Comandos](/larapack/comandos) | Cada comando con sus opciones reales, sus códigos de salida y su salida JSON. |
 | [Qué se genera y dónde va tu código](/larapack/que-se-genera) | El mapa de archivos, los huecos, lo que no se toca y lo que nunca se reescribe. |
 | [Regenerar sin destruir](/larapack/regenerar) | El manifiesto, `--force`, `--dry-run` y el formato con Pint. |
-| [Verificar y auditar](/larapack/verificar) | Las comprobaciones de `verify` y de `audit`, y la línea base. |
+| [Verificar y auditar](/larapack/verificar) | Las comprobaciones de `verify` y de `audit`, las excepciones `#[HandRolled]`, `larapack:fix` y el check de la CI. |
 | [Metas y payload](/larapack/metas) | Datos flexibles sin columna, de punta a punta. |
 | [Rutas, inmutables, secretos y usuarios](/larapack/acciones) | Las doce acciones, `routes`, `immutable`, `secret`, `authenticatable`, `display`, las acciones masivas y la edición en la celda. |
+| [Endpoints declarados](/larapack/endpoints) | Lo que no es CRUD: `endpoints` en un modelo y `controllers` en la raíz, con su interfaz. |
 | [La interfaz generada](/larapack/interfaz) | El módulo Vue y React: vistas, tabla, contrato del modelo, textos y tema. |
 | [Montar un paquete en una aplicación](/larapack/montar-en-aplicacion) | Lo que pone la aplicación anfitriona. |
 | [Exportar a Excel](/larapack/exportar) | La exportación, su configuración y su notificación. |

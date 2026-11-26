@@ -4,6 +4,8 @@ By default a model has twelve actions: the right shape for something a person ma
 
 You don't solve that by generating everything and deleting what you don't need: whatever is deleted by hand stays flagged as edited forever, `larapack:verify` reports it as drift, and the contract stops describing the code. Instead you declare it with four keys: `routes`, `immutable`, `secret` and `authenticatable`. Without them, a model has every action.
 
+What isn't one of the twelve —publishing, importing a roster, a desk, a webhook— isn't written by hand either: it's declared with `endpoints` or `controllers`. See [Declared endpoints](/en/larapack/endpoints).
+
 ## The twelve actions
 
 | Action | Verb and URI | Route name | Request | Policy ability | Event |
