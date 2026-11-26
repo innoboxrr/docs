@@ -92,8 +92,14 @@ destroying work.
 
 `larapack:verify` turns drift into concrete errors:
 
-- a route, method, request or view hand-written for an action the model doesn't
-  declare (`route-not-declared`);
+- a controller, generated or hand-written, that does more than
+  `return $request->handle();`: it validates, authorizes or queries inside
+  (`controller-shape`), or receives a request without `handle()`
+  (`request-handle`);
+- an authorization trait in `Http/Controllers` (`controller-concern`);
+- a route, method, request or view hand-written for an action or endpoint the
+  model doesn't declare (`route-not-declared`), or a declared endpoint missing a
+  piece (`endpoint-missing`);
 - an `immutable` model with a write path (`immutable-write`);
 - a `secret` column leaking through the API, the export or the table
   (`secret-exposed`);
@@ -102,6 +108,67 @@ destroying work.
   point or drift.
 
 Each check is described in [Verify and audit](/en/larapack/verify).
+
+## How drift is prevented with an agent {#guard}
+
+A written rule holds while the agent remembers it, and halfway through a long
+session it stops remembering. In a real application, agents kept
+`return $request->handle();` in every controller LaraPack generated and lost it as
+soon as they had to write one the generator couldn't: a desk, a token exchange, a
+webhook. The project's `CLAUDE.md` forbade it in bold, and that wasn't enough.
+
+So since LaraPack 9 the rule doesn't depend only on someone reading it. There are
+four layers, each for a different moment:
+
+| Layer | When it acts | What it does |
+|---|---|---|
+| **The skill and `AGENTS.md`** | Before writing | They explain the flow, where code goes and when to [declare an endpoint](/en/larapack/endpoints). `larapack:skill` installs the skill and a short block in `AGENTS.md` for Codex and other agents. |
+| **The guard** | On every agent edit | Claude Code hooks that run `larapack:guard`: after every `Write` or `Edit`, the file goes through `verify`'s checks and, if it has errors, the agent gets the reason and the rule with the file still in front of it. At the end of the turn, `verify` on the project. Before every tool, it stops an exception from being approved. |
+| **`larapack:verify`** | Whenever it runs | It checks every controller, request and resource in the project and its packages, not just generated code. |
+| **CI** | On every PR and push | The "LaraPack verify" job runs `verify --strict` and the protected branch requires it. Exceptions are approved by the owner in a file that goes through their review. |
+
+The first three help the agent stay on track; **the fourth is the one that doesn't
+depend on it**. The guard only exists where the hooks are, and an agent working
+without them, another editor, or a person in a hurry don't have it. The protected
+branch does.
+
+**The guard stays out of what isn't its business.** It only blocks for errors in the
+file just touched; warnings are reported without holding anything back. At the end
+of the turn it only holds back for what that session touched, so one console isn't
+trapped by what another left half done. And it never blocks itself: broken input, a
+file in `vendor/` or a project without `vendor/` let it through. That's why it's
+turned on with `verify` green: in a project with existing errors, every edit to
+those files would hold the agent back for something it didn't cause. How to install
+it is in [Preparing the project](/en/ai/setup#guard).
+
+**Exceptions belong to a person.** What genuinely can't follow the pattern —a webhook
+that checks the signature over the raw body— is marked with
+[`#[HandRolled('reason')]`](/en/larapack/verify#handrolled). The project owner
+approves it with `larapack:hand-rolled approve`, which writes
+`.larapack/hand-rolled.lock`, and the approval is the commit of that file
+CODEOWNERS asks them to review. The guard blocks an agent that tries to edit it or
+run `approve`.
+
+### What it guarantees and what it doesn't
+
+It guarantees **the shape**, deterministically:
+
+- that every controller delegates to its request, hand-written ones included;
+- that what isn't CRUD is declared, or is an exception a person approved;
+- that generated code still says what the contract says;
+- that none of that gets into the protected branch without passing
+  `verify --strict`.
+
+**It doesn't guarantee that the logic is right.** What the agent writes inside the
+extension points —what the policy decides, which rows `canView()` lets through, what
+an operation does— can have perfect shape and be wrong. That's covered by behaviour
+tests and a person's review ([What a person reviews](/en/ai/review)). The generated
+tests check that every action requires a session, asks authorization and goes
+through its `ManagedFilter`, but not what authorization decides.
+
+Nor is it airtight locally: an agent can write a file some way the guard doesn't
+see, or work without hooks. What the guard doesn't stop, CI stops; what CI can't
+know, the reviewer sees.
 
 ## What the reviewer gains
 
@@ -113,8 +180,8 @@ authorization and the logic in the extension points. The order is in
 
 ## Where to go next
 
-1. [Preparing the project](/en/ai/setup): install the agent instructions and
-   pick a starting point.
+1. [Preparing the project](/en/ai/setup): install the agent instructions and the
+   guard, and pick a starting point.
 2. [The agent loop](/en/ai/loop): the commands, their exit codes, and what the
    agent must and must not do.
 3. [How to ask for things](/en/ai/prompting): domain-level requests and what

@@ -70,7 +70,7 @@ no existe.»).
     "version": 1,
     "php": {
         "require": "^8.3",
-        "matrix": ["8.3", "8.4"]
+        "matrix": ["8.3", "8.4", "8.5"]
     },
     "laravel": {
         "illuminate": "^13.0",
@@ -82,32 +82,32 @@ no existe.»).
         "larastan/larastan": "^3.0"
     },
     "node": {
-        "engines": ">=20",
+        "engines": ">=22.12",
         "ci": "22"
     },
     "js": {
-        "vite": "^7.1.0",
-        "vitest": "^3.0.0",
+        "vite": "^8.0.0",
+        "vitest": "^5.0.0",
         "vue": "^3.5.0",
         "react": "^19.0.0"
     },
     "internal": {
-        "innoboxrr/larapack-generator": "^7.10",
+        "innoboxrr/larapack-generator": "^9.0",
         "innoboxrr/traits": "^2.1",
         "innoboxrr/support": "^2.1",
         "innoboxrr/search-surge": "^3.0"
     },
     "internalNpm": {
-        "innoboxrr-form-core": "^2.8.0",
-        "innoboxrr-form-elements": "^6.7.0",
-        "innoboxrr-react-form-elements": "^3.7.0",
-        "innoboxrr-vue-datatable": "^3.1.0",
-        "innoboxrr-react-datatable": "^3.1.0",
-        "innoboxrr-http-request": "^2.0.0",
-        "innoboxrr-i18n": "^1.2.0",
-        "innoboxrr-locale-generator": "^2.0.0",
-        "innoboxrr-js-validator": "^2.0.0",
-        "innoboxrr-route-resolver": "^2.0.0"
+        "innoboxrr-form-core": "^2.9.0",
+        "innoboxrr-form-elements": "^6.9.0",
+        "innoboxrr-react-form-elements": "^3.9.0",
+        "innoboxrr-vue-datatable": "^3.2.0",
+        "innoboxrr-react-datatable": "^3.2.0",
+        "innoboxrr-http-request": "^2.1.0",
+        "innoboxrr-i18n": "^1.3.0",
+        "innoboxrr-locale-generator": "^2.1.0",
+        "innoboxrr-js-validator": "^2.1.0",
+        "innoboxrr-route-resolver": "^2.1.0"
     },
     "generated": {
         "require": {
@@ -126,7 +126,7 @@ no existe.»).
 }
 ```
 
-(Sin los comentarios `$comment*` que lleva el archivo real.)
+(Sin los comentarios `$comment*` que lleva el archivo real. Es el de LaraPack 9.0.)
 
 | Clave | Qué fija | Quién la usa |
 |---|---|---|
@@ -165,6 +165,7 @@ comprobaciones de Composer, con `package.json` las de npm, y con los dos, ambas.
 | `no-tests` | error | No hay ningún `*Test.php` | Añadir al menos un test |
 | `workflow-missing` | error | Falta `.github/workflows/tests.yml` o `release.yml` | Crearlo (ver [Los workflows](/ci/workflows)) |
 | `bump-patch` | error o aviso | Queda un `bump-patch.yml` | Sustituirlo por `release.yml` |
+| `verify-job` | aviso | El paquete usa LaraPack y ningún workflow corre `larapack:verify --strict` (desde 9.1) | Añadir el job «LaraPack verify»: `larapack:ci`, o copiarlo de un paquete recién creado. Ver [Los workflows](/ci/workflows#verify) |
 
 Dónde mira cada una:
 
@@ -180,13 +181,21 @@ Dónde mira cada una:
 - **`bump-patch`** es error si el bump cuelga de `push` sin esperar a la suite, y
   aviso si espera (`workflow_run:` o `needs: tests`): no publica a ciegas, pero
   adivina la versión del último tag en vez de declararla.
+- **`verify-job`** sólo mira paquetes que usan LaraPack, y busca
+  `larapack:verify --strict` en sus workflows. Con `larapack:audit --strict` en la
+  CI, el aviso la pone en rojo hasta que el job exista.
+
+En un monorepo, un paquete de `packages/` cuya raíz ya corre `verify --strict` no
+necesita su propio job, y `verify-job` no avisa: el `verify` de la raíz recorre
+`packages/*` con un solo candado. Si la raíz no lo corre, el aviso pide el job en la
+raíz (`larapack:ci` allí), no un `larapack.yml` por paquete.
 
 ### Paquetes npm
 
 | Código | Nivel | Cuándo salta | Qué hacer |
 |---|---|---|---|
 | `npm-field` | aviso | Falta `name`, `version`, `license`, `type`, `exports`, `files` o `sideEffects` | Añadirlo. Se mira la clave: `"sideEffects": false` es válido |
-| `node-engines` | aviso | `engines.node` no es exactamente `>=20` | `"engines": { "node": ">=20" }`. Se compara el texto: `>=20.0.0` también avisa |
+| `node-engines` | aviso | `engines.node` no es exactamente `>=22.12` | `"engines": { "node": ">=22.12" }`. Se compara el texto: `>=22` también avisa |
 | `js-version` | error o aviso | `vite`, `vitest`, `vue` o `react` en `dependencies` o `devDependencies`, contra `js` | Ver la regla |
 | `workflow-missing` | error | Falta `tests.yml` o `release.yml` | Crearlo |
 | `bump-patch` | error o aviso | Queda un `bump-patch.yml` | Sustituirlo |
@@ -194,6 +203,35 @@ Dónde mira cada una:
 Las `peerDependencies` quedan fuera a propósito. Una librería que declara
 `react: ^18 || ^19` hace lo correcto: dice contra qué puede funcionar, no contra qué
 se construye.
+
+### La cadena de pruebas: Node 22.12, Vite 8 y Vitest 5 {#node}
+
+Desde LaraPack 9.0 la línea base de los paquetes npm es **Vite 8 y Vitest 5**, y
+`engines.node` pasa a **`>=22.12`**. La razón es doble: Vitest 5 exige Node
+`^22.12 || >=24`, y Node 20 es EOL desde el 30 de abril de 2026. Los diez paquetes
+`innoboxrr-*` ya migraron (`innoboxrr-form-core` 2.9.0, `innoboxrr-form-elements`
+6.9.0, `innoboxrr-react-form-elements` 3.9.0, los datatables 3.2.0 y el resto en
+la versión menor siguiente), y su CI prueba Node 22 y 24.
+
+Un paquete npm propio que siga en `vitest ^3` o en `engines >=20` sale ahora en
+`larapack:audit` (`js-version`, `node-engines`). Para alinearlo:
+
+1. En `devDependencies`, `vite` `^8.0.0` y `vitest` `^5.0.0` (y lo que dependa de
+   ellos, como `jsdom` o `@vitejs/plugin-*`).
+2. En `package.json`, `"engines": { "node": ">=22.12" }`.
+3. En su `tests.yml`, la matriz sin Node 20:
+
+   ```yaml
+   jobs:
+       tests:
+           uses: innoboxrr/.github/.github/workflows/node-tests.yml@main
+           # Sin Node 20: es EOL y Vitest 5 exige ^22.12 || >=24.
+           with:
+               node-versions: '["22", "24"]'
+   ```
+
+El módulo de interfaz que genera LaraPack ya pedía Vite 8; con 9.0 sus
+dependencias `innoboxrr-*` suben a las versiones de arriba (`internalNpm`).
 
 ### Ninguno de los dos
 
@@ -263,8 +301,8 @@ línea que ejecuta la CI.
 :::
 
 Una **aplicación** no pasa por la auditoría, así que puede pedir el mínimo
-directamente: `app:setup` escribe `innoboxrr/larapack-generator: ^7.10.2` en el
-`require-dev` de la aplicación que crea.
+directamente: `app:setup` escribe en el `require-dev` de la aplicación que crea la
+versión de LaraPack que necesita.
 
 ## Qué no comprueba
 

@@ -62,6 +62,7 @@ const sections: Section[] = [
             { es: ['verificar', 'Verificar y auditar'], en: ['verify', 'Verify and audit'] },
             { es: ['metas', 'Metas y payload'], en: ['metas', 'Metas and payload'] },
             { es: ['acciones', 'Rutas, inmutables, secretos y usuarios'], en: ['actions', 'Routes, immutables, secrets and users'] },
+            { es: ['endpoints', 'Endpoints declarados'], en: ['endpoints', 'Declared endpoints'] },
             { es: ['interfaz', 'La interfaz generada'], en: ['ui', 'The generated UI'] },
             { es: ['montar-en-aplicacion', 'Montar un paquete en una aplicación'], en: ['mount-in-app', 'Mounting a package in an application'] },
             { es: ['exportar', 'Exportar a Excel'], en: ['export', 'Export to Excel'] },

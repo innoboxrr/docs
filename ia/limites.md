@@ -1,7 +1,8 @@
 # Lo que no se delega
 
-Decidir el dominio, dar permisos en las políticas, manejar credenciales y
-secretos, publicar una versión y migrar una base de producción. **El agente puede
+Decidir el dominio, dar permisos en las políticas, aprobar excepciones a la
+arquitectura, manejar credenciales y secretos, publicar una versión y migrar una
+base de producción. **El agente puede
 proponerlo; lo confirma una persona.**
 
 No es desconfianza en el agente. Son las decisiones cuyo error no detecta ninguna
@@ -12,6 +13,7 @@ herramienta, o no se puede deshacer.
 | Escribir y validar `laraimport.json` | Lo propone | Decide el dominio y aprueba el diff |
 | Generar, rellenar huecos, verificar, probar | Lo hace | Revisa |
 | Abrir una habilidad de la política, cambiar la visibilidad | Lo propone | Lo concede |
+| Una excepción `#[HandRolled]`, la protección de la rama | Explica por qué haría falta | La aprueba con `larapack:hand-rolled` y protege la rama |
 | Credenciales, `.env`, secretos de CI | No los toca | Los gestiona |
 | Subir `VERSION` y publicar | Propone el `CHANGELOG` | Decide qué se publica y cuándo |
 | Migraciones | Las escribe y las corre en local | Migra producción |
@@ -35,6 +37,21 @@ Tampoco se delega **quién es administrador**. En la aplicación base lo decide
 `ADMIN_EMAILS` en el `.env` (`config('auth.admins')`), y de ahí dependen las
 políticas, el middleware `admin`, la suplantación, los registros y el editor del
 `.env`.
+
+## Aprobar excepciones y proteger la rama
+
+Un controlador que no sigue el patrón —un webhook que comprueba la firma sobre el
+cuerpo en bruto— puede ser legítimo. Pero si el agente pudiera marcarlo él mismo,
+`#[HandRolled]` sería la forma más corta de que `verify` pasara, y la regla dejaría
+de existir. Por eso la aprobación es un archivo, `.larapack/hand-rolled.lock`, que
+el dueño escribe con `larapack:hand-rolled approve`, revisa y comitea; la guardia
+bloquea a un agente que intenta editarlo o correr el comando, y CODEOWNERS pide la
+revisión del dueño para cualquier cambio en él.
+
+Lo mismo con la puerta: el workflow lo crea `larapack:ci`, pero **proteger la rama
+lo hace una persona** con permisos de administración. El comando imprime la orden
+y nunca la ejecuta. Ver [Excepciones](/larapack/verificar#handrolled) y
+[En la CI](/larapack/verificar#ci).
 
 ## Credenciales y secretos
 

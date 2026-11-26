@@ -17,18 +17,18 @@ npm ls --depth=0 | grep innoboxrr
 | **PHP** | 8.3 o superior | `^8.3`; la CI prueba 8.3 y 8.4 (LaraPack, también 8.5) | — |
 | **Laravel** | 13 | `illuminate/*` `^13.0`, Testbench `^11.0` | — |
 | **PHPUnit** | — | `^12.0 \|\| ^13.0` en los paquetes nuevos | — |
-| **Node** | 20 o superior, con npm 10 | — | `engines.node` `>=20`; la CI prueba 20, 22 y 24; se publica con Node 22 y el npm más reciente |
-| **Vite** | `^8`, con `@vitejs/plugin-vue ^6` o `@vitejs/plugin-react ^6` | El módulo de un paquete, también `^8` | `^7.1` |
-| **Vitest** | — | — | `^3.0` |
+| **Node** | 22.12 o superior | — | `engines.node` `>=22.12`; la CI prueba 22 y 24; se publica con Node 22 y el npm más reciente |
+| **Vite** | `^8`, con `@vitejs/plugin-vue ^6` o `@vitejs/plugin-react ^6` | El módulo de un paquete, también `^8` | `^8.0` |
+| **Vitest** | — | — | `^5.0` |
 | **Vue** | `vue ^3.5`, `vue-router ^4.5`, `pinia ^3` | — | `vue ^3.5` como peer |
 | **React** | `react ^19`, `react-router-dom ^7`, `zustand ^5` | — | `react ^19` como peer |
 | **Sanctum y Excel** | `laravel/sanctum ^4.3`, `maatwebsite/excel ^4.0` | Los mismos, en el `require` que escribe `larapack:new` | — |
 | **axios** | `^1.7` | — | — |
 
 ::: info Nota
-Los paquetes npm prueban con **Vite 7 y Vitest 3** mientras las aplicaciones usan
-**Vite 8**: Vitest 4 con Vite 8.3 no se instala con npm 10, el de Node 20 y 22. Ver
-[Los workflows](/ci/workflows#por-que-los-satelites-siguen-en-vite-7-y-vitest-3).
+Desde LaraPack 9.0 los paquetes npm prueban con **Vite 8 y Vitest 5**, como las
+aplicaciones, y Node 20 sale de la matriz: Vitest 5 exige Node `^22.12 || >=24`.
+Ver [La cadena de pruebas de los paquetes npm](/ci/workflows#node).
 :::
 
 La fuente de verdad de estas versiones es `ecosystem.json`, dentro de LaraPack. Ver
@@ -38,7 +38,7 @@ La fuente de verdad de estas versiones es `ecosystem.json`, dentro de LaraPack. 
 
 | Paquete | Versión | Pide | Actualizar |
 |---|---|---|---|
-| `innoboxrr/larapack-generator` | 7.10.3 | PHP `^8.3`, `illuminate/support ^13.0`, `symfony/console ^7.4 \|\| ^8.0` | [Guía de actualización](/larapack/actualizar) |
+| `innoboxrr/larapack-generator` | 9.0.0 | PHP `^8.3`, `illuminate/support ^13.0`, `symfony/console ^7.4 \|\| ^8.0` | [Guía de actualización](/larapack/actualizar) |
 | `innoboxrr/laravel-setup` | 7.0.1 | PHP `^8.3`, `laravel/framework ^13.0`, LaraPack `^7.10` con `conflict <7.10.2`; instala laravel-auth `^6.1.0` | Sin migración desde la 6.x: la 7 es para aplicaciones nuevas ([Aplicación base](/app-base/)) |
 | `innoboxrr/laravel-auth` | 6.1.0 | PHP `^8.3`, `illuminate/support ^13.0` | [De 6.0 a 6.1 y de 5.x a 6.0](/paquetes/laravel-auth) |
 | `innoboxrr/laravel-options` | 2.1.0 | PHP `^8.3`, `illuminate/support ^13.0`, search-surge `^3.0`, traits `^2.1` | [laravel-options](/paquetes/laravel-options) |
@@ -87,6 +87,7 @@ Un módulo generado declara las versiones de `internalNpm` de `ecosystem.json`
 
 | Versión | Qué cambia | Qué hacer |
 |---|---|---|
+| LaraPack 9.0.0 | `verify` revisa todos los controladores, también los escritos a mano; `endpoints` y `controllers` declaran lo que no es CRUD; la guardia como hook; el Resource filtra `appends` y el IndexRequest fuerza `managed`; la línea base npm pasa a Vite 8, Vitest 5 y Node `>=22.12` | Seguir [De 8.0 a 9.0](/larapack/actualizar#de-80-a-90) |
 | LaraPack 7.10.3 | Con `--format=json`, todos los comandos imprimen sólo el documento JSON, también `larapack:import` y también al fallar. El `models/<kebab>/index.js` generado ya no manda `_token` en las peticiones GET | Actualizar; ver la [guía de actualización](/larapack/actualizar) |
 | `innoboxrr-vue-datatable` y `innoboxrr-react-datatable` 3.1.1 | Las peticiones GET no llevan el token CSRF en la query | Nada |
 | `innoboxrr-js-validator` 2.0.1 | Los mensajes de error se insertan como texto, no como HTML | Si un mensaje llevaba HTML, ahora se ve literal |

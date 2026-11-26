@@ -48,6 +48,7 @@ Si la forma falla, la coherencia no llega a evaluarse. Un error bloquea: `valida
 | `version` | integer, `const 1` | `1` | Versión del contrato. |
 | `models` | array de [modelos](#modelo), al menos uno | obligatoria | Los modelos. El orden no importa. |
 | `pivots` | array de [pivotes](#pivote) | `[]` | Tablas pivote: sólo su migración, sin modelo. |
+| `controllers` | array de controladores | `[]` | Desde 9.0. Endpoints sin modelo: un escritorio, un asistente, un webhook. Ver [Endpoints declarados](/larapack/endpoints). |
 
 No admite otras claves.
 
@@ -67,6 +68,7 @@ No admite otras claves.
 | `routes` | objeto con `only` o `except` | todas las acciones | Qué acciones genera el modelo. Ver [routes](/larapack/acciones#routes). |
 | `immutable` | boolean | `false` | La fila no se modifica ni se borra una vez creada. Ver [immutable](/larapack/acciones#immutable). |
 | `authenticatable` | boolean | `false` | El modelo es el usuario que inicia sesión. Ver [authenticatable](/larapack/acciones#authenticatable). |
+| `endpoints` | array de endpoints | `[]` | Desde 9.0. Lo que no es una de las doce acciones: `publish`, `importRoster`. Ver [Endpoints declarados](/larapack/endpoints). |
 | `assignments` | array | — | **Obsoleta.** Se acepta y no se lee: el trait `Assignment` se genera siempre igual. |
 | `filters` | array | — | **Obsoleta.** Se acepta y no se lee: los filtros son un conjunto fijo. |
 

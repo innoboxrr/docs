@@ -4,6 +4,8 @@ Por defecto un modelo tiene doce acciones: la forma correcta para algo que una p
 
 Eso no se resuelve generando todo y borrando lo que sobra: lo borrado a mano queda marcado como editado para siempre, `larapack:verify` lo señala como deriva y el contrato deja de describir el código. Se declara con cuatro claves: `routes`, `immutable`, `secret` y `authenticatable`. Sin ellas, un modelo tiene todas las acciones.
 
+Lo que no es una de las doce —publicar, importar una lista, un escritorio, un webhook— tampoco se escribe a mano: se declara con `endpoints` o `controllers`. Ver [Endpoints declarados](/larapack/endpoints).
+
 ## Las doce acciones
 
 | Acción | Verbo y URI | Nombre de ruta | Request | Habilidad de la política | Evento |

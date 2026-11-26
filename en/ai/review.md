@@ -53,6 +53,11 @@ The model is a facade: a method in `Operations` that orchestrates, and the real 
 in the class it belongs to. Look for logic where it doesn't belong: the controller,
 the routes file, a view.
 
+`verify` already guarantees that no controller does more than
+`return $request->handle();`. What it can't know is whether what's inside the
+request, the policy or the operation is what the business asks for: that's what you
+review here, and what the tests in step 5 have to check.
+
 ### 4. That `verify` flags only extension points as customised
 
 ```bash
@@ -71,6 +76,12 @@ orders, the policy rejects whoever it should. If the agent only left the generat
 tests, the change has no tests.
 
 ## Also
+
+- **Every new `#[HandRolled]` and every change to `.larapack/hand-rolled.lock`.** An
+  exception to the pattern is approved by the project owner, not by whoever writes
+  it. Ask why it couldn't be declared as an endpoint or solved with a `FormRequest`
+  (`failedValidation()` and `failedAuthorization()` cover almost every protocol).
+  With [`larapack:ci`](/en/larapack/verify#ci), CODEOWNERS asks you for that review.
 
 - **`.larapack/manifest.json` changes together with the code.** A commit that
   generates without updating the manifest leaves the generator blind.
@@ -96,6 +107,10 @@ tests, the change has no tests.
 | Edited the create migration of an already migrated table | The change never reaches the database, and LaraPack can no longer write alters |
 | Hard-coded Spanish or English text in a view | It should be keys through `t()` |
 | Edited generated tests to make them pass | Generated tests pass as generated: if they fail, something broke |
+| A controller with validation, authorization or queries inside | `verify` fails with `controller-shape`: it goes in the request, or is declared as an endpoint |
+| A `#[HandRolled]` nobody asked for | A way to make `verify` pass without fixing anything; with a lock, it fails as unapproved |
+| Changes to `.larapack/hand-rolled.lock` made by the agent | Approval is the owner's; the guard blocks it, so the agent went around it |
+| Hooks in `.claude/settings.json` removed or changed | The agent switched the guard off |
 
 Whichever it is, the answer is the same: ask the agent to declare it in
 `laraimport.json`, regenerate and verify again.

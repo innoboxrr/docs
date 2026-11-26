@@ -20,8 +20,12 @@ No todos los comandos las tienen:
 | `larapack:validate` | ✓ | — | — | ✓ |
 | `larapack:import` | ✓ | ✓ | ✓ | ✓ |
 | `larapack:verify` | ✓ | — | — | ✓ |
+| `larapack:fix` | ✓ | — | ✓ (enseña el diff) | ✓ |
 | `larapack:audit` | — | — | — | ✓ |
 | `larapack:skill` | ✓ | ✓ (sobrescribe el destino) | — | — |
+| `larapack:guard` | ✓ | — | — | — |
+| `larapack:hand-rolled` | ✓ | — | — | ✓ |
+| `larapack:ci` | ✓ | ✓ (sobrescribe el workflow) | ✓ | — |
 | `larapack:full-model` | ✓ | ✓ | ✓ | ✓ |
 | `larapack:remove-full-model` | ✓ | — | — | — |
 | `larapack:providers`, los cuatro `*-service-provider` y `larapack:config` | ✓ | ✓ | ✓ | ✓ |
@@ -37,9 +41,13 @@ No todos los comandos las tienen:
 | [`larapack:schema`](#larapack-schema) | — | Imprime el JSON Schema del contrato. |
 | [`larapack:validate`](#larapack-validate) | `[jsonPath]` | Valida un `laraimport.json` sin generar nada. |
 | [`larapack:import`](#larapack-import) | `[jsonPath]` | Genera todos los modelos y pivotes de un `laraimport.json`. |
-| [`larapack:verify`](#larapack-verify) | — | Comprueba lo generado contra el manifiesto. |
+| [`larapack:verify`](#larapack-verify) | — | Comprueba lo generado contra el manifiesto y que todo controlador delegue en su request. |
+| [`larapack:fix`](#larapack-fix) | `<checks>...` | Corrige `index-managed` y `resource-appends` en lo generado antes de 9.0. |
 | [`larapack:audit`](#larapack-audit) | `[path]` | Comprueba la línea base del ecosistema. |
-| [`larapack:skill`](#larapack-skill) | — | Instala en el proyecto las instrucciones para un agente. |
+| [`larapack:skill`](#larapack-skill) | — | Instala en el proyecto las instrucciones para un agente; con `--hooks`, la guardia. |
+| [`larapack:guard`](#larapack-guard) | — | Hook para agentes: comprueba el archivo recién editado. |
+| [`larapack:hand-rolled`](#larapack-hand-rolled) | `<action> [targets...]` | Lista, aprueba o retira las excepciones `#[HandRolled]`. Lo corre el dueño del proyecto. |
+| [`larapack:ci`](#larapack-ci) | — | Crea el workflow «LaraPack verify» y, con `--owner`, las líneas de CODEOWNERS. |
 
 ### Un modelo entero
 
@@ -114,11 +122,12 @@ Lo que crea, con las versiones del `ecosystem.json` del LaraPack que lo ejecuta:
 | `config/<clave>.php` | La configuración de la exportación. |
 | `tests/TestCase.php`, `tests/User.php`, `tests/Feature/PackageBootsTest.php` | La base de tests y un primer test que comprueba que los proveedores arrancan y las migraciones corren. |
 | `phpunit.xml.dist` | La configuración de PHPUnit. |
-| `.github/workflows/tests.yml`, `.github/workflows/release.yml` | Los workflows del ecosistema, con el trabajo `quality` (Pint y Larastan). |
+| `.github/workflows/tests.yml`, `.github/workflows/release.yml` | Los workflows del ecosistema, con el trabajo `quality` (Pint y Larastan) y, desde 9.1, el job «LaraPack verify» (`larapack:verify --strict`). |
 | `pint.json`, `phpstan.neon.dist` | Preset `laravel`; Larastan nivel 5 sobre `src` y `database`. |
 | `VERSION` | `0.1.0`. |
-| `README.md`, `CHANGELOG.md`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `LICENSE` | Los archivos del repositorio. `AGENTS.md` apunta a la skill. |
+| `README.md`, `CHANGELOG.md`, `AGENTS.md`, `.gitignore`, `.gitattributes`, `LICENSE` | Los archivos del repositorio. `AGENTS.md` lleva el bloque de LaraPack entre sus marcadores. |
 | `.claude/skills/larapack/SKILL.md` | La skill instalada. |
+| `.claude/settings.json` | Los hooks de la [guardia](#larapack-guard), como con `larapack:skill --hooks`. |
 
 Un paquete recién creado pasa `larapack:audit` sin hallazgos. Los pasos siguientes están en [Un paquete nuevo](/empezar/paquete-nuevo).
 
@@ -175,13 +184,19 @@ En texto escribe además su progreso, modelo a modelo. Con `--format=json` no es
 
 ## larapack:verify {#larapack-verify}
 
+```bash
+php vendor/bin/builder larapack:verify --strict --format=json
+php vendor/bin/builder larapack:verify --check=controller-shape --check=request-handle
+```
+
 | Opción | Por defecto | Qué es |
 |---|---|---|
-| `--strict` | — | Los avisos cuentan como fallo. |
+| `--strict` | — | Los avisos cuentan como fallo. Es lo que corre el job «LaraPack verify» de la CI. |
+| `--check=` | todas | Sólo esa comprobación. Se repite para correr varias; un nombre desconocido falla en vez de dar un verde falso. |
 | `--root=` | se descubre | |
-| `--format=` | `txt` | `txt` o `json`. |
+| `--format=` | `txt` | `txt` o `json`. Con `--check`, sigue siendo un único documento. |
 
-Lee sólo `.larapack/manifest.json` y los archivos. Sale con 1 si hay errores, o avisos con `--strict`. Las comprobaciones están en [Verificar y auditar](/larapack/verificar).
+Lee `.larapack/manifest.json`, los archivos generados y, desde 9.0, todos los controladores, requests y resources de la raíz y de los paquetes locales, sin cargarlos ni ejecutarlos. Sale con 1 si hay errores, o avisos con `--strict`. Las comprobaciones, con su nombre para `--check`, están en [Verificar y auditar](/larapack/verificar#verify).
 
 ## larapack:audit {#larapack-audit}
 
@@ -197,7 +212,7 @@ php vendor/bin/builder larapack:audit packages --all      # cada paquete de un d
 | `--strict` | — | Los avisos cuentan como fallo. |
 | `--format=` | `txt` | `txt` o `json`. |
 
-No tiene `--root`: la ruta es el argumento. Una ruta que no existe sale con 1. Las comprobaciones están en [Verificar y auditar](/larapack/verificar#audit).
+No tiene `--root`: la ruta es el argumento. Una ruta que no existe sale con 1. Las comprobaciones están en [Verificar y auditar](/larapack/verificar#audit). Desde 9.1 incluye `verify-job`: un paquete que usa LaraPack y cuya CI no corre `larapack:verify --strict`.
 
 ## larapack:skill {#larapack-skill}
 
@@ -207,9 +222,97 @@ No tiene `--root`: la ruta es el argumento. Una ruta que no existe sale con 1. L
 | `--print` | — | Escribe el texto en la salida estándar en lugar de instalarlo. |
 | `--source` | — | Imprime sólo la ruta del original, dentro de LaraPack. |
 | `--force` | — | Sobrescribe el destino aunque exista. |
+| `--hooks` | — | Fusiona en `.claude/settings.json` los hooks que ejecutan [`larapack:guard`](#larapack-guard). |
+| `--no-agents` | — | No escribe el bloque de LaraPack en `AGENTS.md`. |
 | `--root=` | se descubre | |
 
-Sin `--force` no pisa un destino que ya existe, porque puede estar ampliado con reglas del proyecto: dice si está al día o si difiere del paquete, y sale con 0 en los dos casos. Tras actualizar LaraPack, reinstálala con `--force`. Ver [Preparar el proyecto](/ia/preparar).
+Sin `--force` no pisa un destino que ya existe, porque puede estar ampliado con reglas del proyecto: dice si está al día o si difiere del paquete, y sale con 0 en los dos casos. Tras actualizar LaraPack, reinstálala con `--force`.
+
+Además, desde 9.0:
+
+- **Escribe un bloque en `AGENTS.md`**, para Codex y otros agentes, entre `<!-- LARAPACK:BEGIN -->` y `<!-- LARAPACK:END -->`. Crea el archivo si no existe, añade el bloque al final si no tiene marcadores y, si los tiene, sólo reescribe lo de dentro: las reglas del proyecto van fuera. No necesita `--force`. Con `--path=AGENTS.md` no se añade: el skill entero ya es ese archivo.
+- **Con `--hooks`** fusiona los hooks sin duplicar ni tocar los demás: PostToolUse (`Write|Edit|MultiEdit`) con `larapack:guard`, Stop con `larapack:guard --stop` y, desde 9.1, PreToolUse (`Write|Edit|MultiEdit|Bash`) con `larapack:guard --pre`. Mientras no exista `vendor/`, el hook no hace nada en vez de fallar.
+- **No escribe a través de un enlace simbólico** que saque del proyecto (desde 9.1): un `.claude/settings.json` enlazado al global de quien clona no recibe los hooks.
+
+Ver [Preparar el proyecto](/ia/preparar).
+
+## larapack:fix {#larapack-fix}
+
+```bash
+php artisan larapack:fix index-managed resource-appends --dry-run
+php artisan larapack:fix index-managed resource-appends
+php artisan larapack:fix index-managed --package=catalogo --format=json
+php artisan larapack:fix resource-appends --package=app --dry-run
+```
+
+| Argumento u opción | Por defecto | Qué es |
+|---|---|---|
+| `checks` | obligatorio | Qué corregir: `index-managed`, `resource-appends` o los dos. |
+| `--dry-run` | — | Enseña el diff unificado de cada archivo sin escribir nada. |
+| `--path=` | toda la raíz | Sólo lo que cuelga de ese subdirectorio de la raíz. |
+| `--package=` | todos | Sólo ese paquete local, por el nombre de su directorio en `packages/` o su nombre de Composer, o `app` para lo que no cuelga de ningún paquete. Repetible; se combina con `--path`. Un nombre que no existe falla con la lista de los que hay. |
+| `--root=`, `--format=` | | Las [opciones comunes](#opciones-comunes). |
+
+Hace en cada archivo el mismo cambio, sacado de la plantilla, y sólo donde reconoce con certeza la forma generada; lo demás lo lista como `skipped` con su razón. Sale con 1 si se saltó algo. Qué cambia y qué reporta sin arreglar está en [Arreglar lo viejo](/larapack/verificar#fix).
+
+## larapack:guard {#larapack-guard}
+
+No se corre a mano: lo ejecutan los hooks que instala `larapack:skill --hooks`. Lee de la entrada estándar el JSON del hook de Claude Code.
+
+| Opción | Qué es |
+|---|---|
+| (ninguna) | Tras editar. Si el archivo es un controlador, una request, una ruta, una política, una migración o algo generado que no es un hueco, le pasa las comprobaciones de `verify`. |
+| `--stop` | Al terminar el turno. Verifica el proyecto entero y retiene sólo por los errores de lo que tocó la sesión. |
+| `--pre` | Antes de la herramienta (desde 9.1). Impide editar `.larapack/hand-rolled.lock`, escribirlo desde Bash (una redirección, `tee`, `cp`, `sed -i`…) y correr `larapack:hand-rolled approve` o `revoke`. |
+| `--root=` | La raíz del proyecto; por omisión, la del archivo tocado. |
+
+| Código | Qué hace Claude Code |
+|---|---|
+| `0` | Sigue. También con una entrada vacía o rota, un archivo de `vendor/` o fuera de un proyecto: la guardia nunca se bloquea a sí misma. |
+| `2` | Bloquea, y le devuelve al modelo el motivo y la regla. Sólo por **errores** en el archivo tocado; los avisos no bloquean. |
+| `1` | Un fallo de la propia guardia o un `--root` que no existe: se lo enseña al usuario sin bloquear al agente. |
+
+Qué vigila y qué no está en [Desarrollo con IA](/ia/#guardia).
+
+## larapack:hand-rolled {#larapack-hand-rolled}
+
+Desde 9.1. Lo corre **el dueño del proyecto**, no un agente: la guardia se lo impide a los agentes.
+
+```bash
+php artisan larapack:hand-rolled list
+php artisan larapack:hand-rolled approve --all
+php artisan larapack:hand-rolled approve TokenController::store
+php artisan larapack:hand-rolled revoke 'App\Http\Controllers\StripeWebhookController'
+```
+
+| Argumento u opción | Qué es |
+|---|---|
+| `action` | `list`, `approve` o `revoke`. |
+| `targets` | `Clase` o `Clase::metodo`, como los da `list`. Basta el final del nombre que lo distinga; si coincide con más de uno, falla sin cambiar nada. |
+| `--all` | Con `approve`: aprueba todas las excepciones del código. |
+| `--root=`, `--format=` | Las [opciones comunes](#opciones-comunes). |
+
+`list` da el estado de cada excepción: `approved`, `unapproved`, `reason-changed`, `code-changed` (la huella del código ya no coincide con la aprobada), `stale` (en el candado y ya no en el código) o `no-lock`. `approve` y `revoke` escriben `.larapack/hand-rolled.lock`, con `target`, `reason` y `fingerprint` por entrada; `approve` recalcula la huella. Aprobar es correr el comando, revisar el diff del candado y comitearlo. Ver [Excepciones](/larapack/verificar#handrolled).
+
+## larapack:ci {#larapack-ci}
+
+Desde 9.1. Pone `larapack:verify --strict` como check de la rama en un proyecto que ya existe.
+
+```bash
+php artisan larapack:ci --dry-run
+php artisan larapack:ci --owner=@acme/arquitectura
+```
+
+| Opción | Qué es |
+|---|---|
+| `--owner=` | Dueño en CODEOWNERS: `@usuario`, `@organización/equipo` o un correo. Repetible. Sin ella no se toca CODEOWNERS. |
+| `--dry-run` | Enseña el diff del workflow y las líneas de CODEOWNERS sin escribir nada. |
+| `--force` | Sobrescribe `.github/workflows/larapack.yml` aunque difiera. |
+| `--runs-on=` | Etiqueta del runner, repetible (`--runs-on=self-hosted --runs-on=linux`), o una lista JSON (`--runs-on='["self-hosted","linux"]'`). Sin ella, `ubuntu-latest`. |
+| `--enforce-admins`, `--no-enforce-admins` | En la orden de protección, `enforce_admins`: `true` de fábrica, para que tampoco un administrador se salte el check; `--no-enforce-admins` lo pone en `false` y la salida avisa. |
+| `--root=` | Las [opciones comunes](#opciones-comunes). |
+
+Crea `.github/workflows/larapack.yml` con el job «LaraPack verify», fusiona CODEOWNERS e imprime la orden que protege la rama, con cada argumento entre comillas simples, sin ejecutarla. Si el workflow ya existe y difiere, enseña el diff, no escribe nada —tampoco CODEOWNERS— y sale con 1. No tiene `--format`. Ver [En la CI](/larapack/verificar#ci).
 
 ## larapack:full-model {#larapack-full-model}
 
@@ -219,7 +322,7 @@ php artisan larapack:full-model AuditEvent --only=policies,index,show --immutabl
 
 | Argumento u opción | Qué es |
 |---|---|
-| `name` | Nombre del modelo, en PascalCase. |
+| `name` | Nombre del modelo, en PascalCase. Desde 9.0 tiene que ser un identificador (`^[A-Za-z][A-Za-z0-9_]*`): un nombre con `-`, espacios o rutas falla. |
 | `--vue`, `--react` | Genera también su módulo de interfaz. |
 | `--metas` | Genera el modelo con metas, conectado como con `metas: true`. |
 | `--only=a,b` | Sólo estas acciones, separadas por comas. |
@@ -283,6 +386,7 @@ El importador no genera proveedores. Un paquete creado con `larapack:new` ya los
 |---|---|
 | `0` | Terminó bien. En `validate`, `verify` y `audit`: sin errores, y sin avisos si se pasó `--strict`. |
 | `1` | Algo falló. |
+| `2` | Sólo `larapack:guard`: el hook bloquea la herramienta. Ver [larapack:guard](#larapack-guard). |
 
 Qué hace salir con 1:
 
@@ -291,10 +395,18 @@ Qué hace salir con 1:
 - `audit`: una ruta que no existe.
 - `new`: un nombre o un namespace inválidos, un directorio con `composer.json` o un directorio que no se puede crear.
 - `full-model`: `--only` junto a `--except`, una acción desconocida o `--immutable` con una escritura en `--only`.
+- Cualquier comando que recibe un nombre de modelo: un nombre que no es un identificador (desde 9.0).
+- `fix`: algún archivo `skipped`, un `--path` o un `--package` que no existen.
+- `hand-rolled`: un objetivo que no existe o que coincide con varios.
+- `ci`: un workflow que ya existe y difiere, sin `--force`.
 - Cualquier comando con `--root`: una raíz que no existe.
 - Cualquier comando: un argumento obligatorio que falta o una opción desconocida.
 
 `schema`, `skill` y `remove-full-model` salen con 0 salvo que algo lance una excepción.
+
+::: warning `remove-full-model` y el nombre
+Hasta 8.x, `larapack:remove-full-model ..` (o `.`, o vacío) borraba las carpetas de requests, filtros, eventos y notificaciones de **todos** los modelos. Desde 9.0 el nombre se valida y borrar ya no sigue enlaces simbólicos.
+:::
 
 ## Salida JSON {#salida-json}
 
@@ -412,6 +524,55 @@ Algunos fallos añaden claves:
 | `findings[].model` | El modelo, o `null` para lo que no es de ninguno (proveedores, configuración, andamiaje del módulo). |
 | `findings[].file` | El archivo, relativo a la raíz, o `null`. |
 | `findings[].message` | Qué pasa y qué hacer. |
+
+### Salida de larapack:fix {#json-fix}
+
+```json
+{
+    "ok": true,
+    "dry_run": false,
+    "formatted": true,
+    "checks": {
+        "index-managed": {
+            "fixed": ["src/Http/Requests/Post/IndexRequest.php"],
+            "skipped": [],
+            "unchanged": 11,
+            "admin_path_missing": [],
+            "managed_filter_unresolved": []
+        },
+        "resource-appends": {
+            "fixed": [],
+            "skipped": [],
+            "unchanged": 12,
+            "appendable_proposals": { "confirmed": false, "warning": "…", "resources": [], "unassociated": [] }
+        }
+    }
+}
+```
+
+Por comprobación: lo arreglado, lo saltado con su razón y cuántos archivos ya estaban bien, más lo que se reporta sin arreglar. `appendable_proposals.confirmed` siempre es `false`: son propuestas.
+
+### Salida de larapack:hand-rolled {#json-hand-rolled}
+
+`list`:
+
+```json
+{
+    "ok": true,
+    "lock": ".larapack/hand-rolled.lock",
+    "exceptions": [
+        {
+            "target": "Acme\\Catalogo\\Http\\Controllers\\StripeWebhookController",
+            "reason": "La firma se calcula sobre el cuerpo en bruto.",
+            "file": "src/Http/Controllers/StripeWebhookController.php",
+            "line": 8,
+            "status": "approved"
+        }
+    ]
+}
+```
+
+`lock` es `null` sin candado. `approve` y `revoke` responden con `action`, `lock`, `changed` (si el candado cambió) y `targets`.
 
 ### Salida de larapack:audit {#json-audit}
 

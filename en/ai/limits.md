@@ -1,7 +1,8 @@
 # What is not delegated
 
-Deciding the domain, granting permissions in policies, handling credentials and
-secrets, releasing a version, and migrating a production database. **The agent can
+Deciding the domain, granting permissions in policies, approving exceptions to the
+architecture, handling credentials and secrets, releasing a version, and migrating a
+production database. **The agent can
 propose it; a person confirms it.**
 
 It isn't distrust of the agent. These are the decisions whose mistakes no tool
@@ -12,6 +13,7 @@ detects, or that can't be undone.
 | Write and validate `laraimport.json` | Proposes it | Decides the domain and approves the diff |
 | Generate, fill extension points, verify, test | Does it | Reviews |
 | Open a policy ability, change visibility | Proposes it | Grants it |
+| A `#[HandRolled]` exception, branch protection | Explains why it would be needed | Approves it with `larapack:hand-rolled` and protects the branch |
 | Credentials, `.env`, CI secrets | Doesn't touch them | Manages them |
 | Bump `VERSION` and release | Drafts the `CHANGELOG` | Decides what ships, and when |
 | Migrations | Writes and runs them locally | Migrates production |
@@ -34,6 +36,21 @@ test: it becomes a data leak.
 **Who is an admin** isn't delegated either. In the base application it's decided by
 `ADMIN_EMAILS` in `.env` (`config('auth.admins')`), and the policies, the `admin`
 middleware, impersonation, the log viewer and the `.env` editor all depend on it.
+
+## Approving exceptions and protecting the branch
+
+A controller that doesn't follow the pattern —a webhook that checks the signature
+over the raw body— can be legitimate. But if the agent could mark it itself,
+`#[HandRolled]` would be the shortest way to make `verify` pass, and the rule would
+stop existing. That's why the approval is a file, `.larapack/hand-rolled.lock`, that
+the owner writes with `larapack:hand-rolled approve`, reviews and commits; the guard
+blocks an agent that tries to edit it or run the command, and CODEOWNERS requires the
+owner's review for any change to it.
+
+The same goes for the gate: `larapack:ci` creates the workflow, but **protecting the
+branch is done by a person** with admin rights. `larapack:ci` prints the command and
+never runs it. See [Exceptions](/en/larapack/verify#handrolled) and
+[In CI](/en/larapack/verify#ci).
 
 ## Credentials and secrets
 

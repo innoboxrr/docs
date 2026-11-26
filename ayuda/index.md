@@ -734,8 +734,10 @@ provenance.
 
 **Causa.** Vitest 4 con Vite 8.3 no se instala con npm 10, el que traen Node 20 y 22.
 
-**Solución.** Los paquetes npm del ecosistema siguen en `vite ^7.1` y `vitest ^3`. Ver
-[Los workflows](/ci/workflows#por-que-los-satelites-siguen-en-vite-7-y-vitest-3).
+**Solución.** Pasa a Vitest 5 y quita Node 20 de la matriz, como hicieron los paquetes
+del ecosistema desde LaraPack 9.0: `vite ^8`, `vitest ^5`, `engines.node >=22.12` y
+`node-versions: '["22", "24"]'`. Ver
+[La cadena de pruebas de los paquetes npm](/ci/workflows#node).
 
 ### El release de npm terminó y `npm view` muestra la versión anterior
 

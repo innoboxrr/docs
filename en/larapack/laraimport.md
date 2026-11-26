@@ -48,6 +48,7 @@ If the shape fails, coherence isn't evaluated. An error blocks: `validate` exits
 | `version` | integer, `const 1` | `1` | Contract version. |
 | `models` | array of [models](#model), at least one | required | The models. Order doesn't matter. |
 | `pivots` | array of [pivots](#pivot) | `[]` | Pivot tables: only their migration, no model. |
+| `controllers` | array of controllers | `[]` | Since 9.0. Endpoints with no model: a desk, a wizard, a webhook. See [Declared endpoints](/en/larapack/endpoints). |
 
 No other keys are allowed.
 
@@ -67,6 +68,7 @@ No other keys are allowed.
 | `routes` | object with `only` or `except` | every action | Which actions the model generates. See [routes](/en/larapack/actions#routes). |
 | `immutable` | boolean | `false` | The row isn't modified or deleted once created. See [immutable](/en/larapack/actions#immutable). |
 | `authenticatable` | boolean | `false` | The model is the user who logs in. See [authenticatable](/en/larapack/actions#authenticatable). |
+| `endpoints` | array of endpoints | `[]` | Since 9.0. What isn't one of the twelve actions: `publish`, `importRoster`. See [Declared endpoints](/en/larapack/endpoints). |
 | `assignments` | array | — | **Deprecated.** Accepted and not read: the `Assignment` trait is always generated the same way. |
 | `filters` | array | — | **Deprecated.** Accepted and not read: filters are a fixed set. |
 
