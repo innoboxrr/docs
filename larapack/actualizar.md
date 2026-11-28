@@ -25,7 +25,8 @@ Mira la versión instalada con `composer show innoboxrr/larapack-generator` y bu
 | 7.10.2 | Bajo | La salida de `--format=json` y el contrato del modelo sin `_token` por GET | [7.10.2 → 7.10.3](#de-7102-a-7103) y siguientes |
 | 7.10.3 | Bajo | Claves ajenas `restrict` en tablas nuevas | [7.10 → 8.0](#de-710-a-80) y siguientes |
 | 8.x | Alto en una aplicación con controladores escritos a mano; bajo si no | `verify` revisa todos los controladores; el Resource filtra `appends`; el nombre del modelo se valida | [8.0 → 9.0](#de-80-a-90) y siguientes |
-| 9.0 | Nada hasta que se activa | El candado de `#[HandRolled]`, el check obligatorio en la CI y los tests de autorización | [9.0 → 9.1](#de-90-a-91) |
+| 9.0 | Nada hasta que se activa | El candado de `#[HandRolled]`, el check obligatorio en la CI y los tests de autorización | [9.0 → 9.1](#de-90-a-91) y siguientes |
+| 9.1 – 9.3 | Bajo | `verify` revisa más formas de saltarse la regla; regenerar la CI | [9.1 → 9.4](#de-91-a-94) |
 
 ## El procedimiento, sea cual sea la versión
 
@@ -472,3 +473,29 @@ Tres cosas que conviene saber antes:
 **Al regenerar** sólo cambia lo generado donde había valores raros: etiquetas de `enum` con `&` o `}` en el formulario Vue, valores de `enum` con saltos de línea y defaults en cadena que no son un número decimal normal. La guardia guarda su estado en otro directorio, así que el de una sesión abierta antes de actualizar se pierde.
 
 **Los defaults que cambian.** Sólo los `default` de modelo en cadena con ceros a la izquierda (`"01"`, `"007"`), con exponente (`"1e3"`) o con espacios (`" 1"`): la 9.0 los escribía sin comillas —`->default(01)` era el entero 1— y ahora van entre comillas. `"10.00"`, `"0.00"` y `"1.10"` siguen saliendo `->default(10.00)`, como en 9.0. Si la migración de creación no se editó, el siguiente `larapack:import` escribe una `_alter_<tabla>_table` con `->change()` para esas columnas; si se editó, la conserva y pide escribir la alteración. Revisa la alteración antes de migrar: `->change()` reescribe la definición entera de la columna, así que una longitud o precisión cambiada a mano en otra migración se pierde. Los pivotes no tienen alteración: sólo cambia la migración de un pivote nuevo, que ahora usa el mismo literal (antes `true` salía `'1'` y `false`, `''`).
+
+## De 9.1 a 9.4 {#de-91-a-94}
+
+**Nada cambia si no se usa `larapack:realign`.** El esquema del contrato sólo añade claves opcionales (`length`, `precision`/`scale`, `use_current`, `indexes[]`, `table`, `route_name`) y lo que no se declara se genera igual. El manifiesto pasa a la versión 2 la primera vez que se escribe. Lo que trae, además de 9.2 y 9.3 (en el `CHANGELOG.md`):
+
+- **[Realinear un proyecto existente](/larapack/realinear)** con `larapack:realign`.
+- **[Varias consolas a la vez](/larapack/varias-consolas)** con `larapack:reconcile` y las comprobaciones de fusión de `verify`.
+- **Una auditoría de seguridad** de lo que `verify --strict` dejaba pasar: acciones heredadas, clases dentro de bloques, controladores fuera de `Http/Controllers`, acciones de ruta que no son un closure en línea, y el manifiesto que dice menos que el contrato (`manifest-declaration`).
+
+Al actualizar:
+
+```bash
+composer require --dev innoboxrr/larapack-generator:"^9.4"
+php artisan larapack:skill --force          # la guía del realineamiento para los agentes
+php artisan larapack:ci --force             # reconcile --check, pint --test y actions: read en la puerta
+php artisan larapack:ci --approval --force  # si alguien aprueba sin terminal
+php artisan larapack:import --force         # anota la huella del contrato en el manifiesto
+php artisan larapack:verify --strict
+```
+
+- **`contract-outdated`**: desde el primer `import --force`, cambiar el `laraimport.json` sin volver a importar es un error de `verify`. Hasta ese import no compara nada.
+- **Controladores de una acción fuera de `Http/Controllers`** (en `Actions/`, por ejemplo) que una ruta usa como acción salen como `controller-shape` si no delegan: se llevan a su request o se declaran con `#[HandRolled]`.
+- **CODEOWNERS**: `larapack:ci --owner` cubre ahora las tres rutas donde GitHub lo busca, todos los workflows y `.githooks/`. Vuelve a correrlo.
+- **Aprobar sin terminal**: una aprobación hecha antes sin `approved_run` hace fallar el paso de la CI. Apruébala de nuevo en la terminal o en el workflow de aprobación.
+- **Versiona** `.larapack/realign/plan.json` y `exceptions.json` si realineas; la caché ya viene ignorada.
+- **Un `import` después de adoptar** puede escribir alteraciones: `--dry-run` y revísalas antes de migrar.
