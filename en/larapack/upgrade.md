@@ -25,7 +25,8 @@ Check the installed version with `composer show innoboxrr/larapack-generator` an
 | 7.10.2 | Low | The `--format=json` output and the model contract without `_token` on GET | [7.10.2 → 7.10.3](#from-7102-to-7103) and later |
 | 7.10.3 | Low | `restrict` foreign keys on new tables | [7.10 → 8.0](#from-710-to-80) and later |
 | 8.x | High in an application with hand-written controllers; low otherwise | `verify` checks every controller; the Resource filters `appends`; the model name is validated | [8.0 → 9.0](#from-80-to-90) and later |
-| 9.0 | Nothing until you turn it on | The `#[HandRolled]` lock, the required CI check and the authorization tests | [9.0 → 9.1](#from-90-to-91) |
+| 9.0 | Nothing until you turn it on | The `#[HandRolled]` lock, the required CI check and the authorization tests | [9.0 → 9.1](#from-90-to-91) and following |
+| 9.1 – 9.3 | Low | `verify` checks more ways around the rule; regenerate the CI | [9.1 → 9.4](#from-91-to-94) |
 
 ## The procedure, whatever your version
 
@@ -472,3 +473,29 @@ Three things worth knowing first:
 **When regenerating**, generated code only changes where there were odd values: `enum` labels with `&` or `}` in the Vue form, `enum` values with line breaks, and string defaults that aren't a plain decimal number. The guard keeps its state in a different directory, so the state of a session opened before upgrading is lost.
 
 **The defaults that change.** Only model `default` strings with leading zeros (`"01"`, `"007"`), an exponent (`"1e3"`) or spaces (`" 1"`): 9.0 wrote them unquoted —`->default(01)` was the integer 1— and now they're quoted. `"10.00"`, `"0.00"` and `"1.10"` still come out as `->default(10.00)`, as in 9.0. If the create migration wasn't edited, the next `larapack:import` writes an `_alter_<table>_table` with `->change()` for those columns; if it was edited, it keeps it and asks you to write the alteration. Review the alteration before migrating: `->change()` rewrites the column's whole definition, so a length or precision changed by hand in another migration is lost. Pivots have no alteration: only a new pivot's migration changes, which now uses the same literal (before, `true` came out as `'1'` and `false` as `''`).
+
+## From 9.1 to 9.4 {#from-91-to-94}
+
+**Nothing changes unless you use `larapack:realign`.** The contract schema only adds optional keys (`length`, `precision`/`scale`, `use_current`, `indexes[]`, `table`, `route_name`) and whatever is not declared is generated as before. The manifest moves to version 2 the first time it is written. What it brings, besides 9.2 and 9.3 (in `CHANGELOG.md`):
+
+- **[Realigning an existing project](/en/larapack/realign)** with `larapack:realign`.
+- **[Many consoles at once](/en/larapack/multiple-consoles)** with `larapack:reconcile` and `verify`'s merge checks.
+- **A security audit** of what `verify --strict` let through: inherited actions, classes inside blocks, controllers outside `Http/Controllers`, route actions that are not an inline closure, and a manifest that says less than the contract (`manifest-declaration`).
+
+When upgrading:
+
+```bash
+composer require --dev innoboxrr/larapack-generator:"^9.4"
+php artisan larapack:skill --force          # the realignment guide for agents
+php artisan larapack:ci --force             # reconcile --check, pint --test and actions: read in the gate
+php artisan larapack:ci --approval --force  # if someone approves without a terminal
+php artisan larapack:import --force         # records the contract fingerprint in the manifest
+php artisan larapack:verify --strict
+```
+
+- **`contract-outdated`**: from the first `import --force` on, changing `laraimport.json` without importing again is a `verify` error. Until that import it compares nothing.
+- **Single-action controllers outside `Http/Controllers`** (in `Actions/`, for instance) that a route uses as its action show up as `controller-shape` if they do not delegate: move them to their request or declare them with `#[HandRolled]`.
+- **CODEOWNERS**: `larapack:ci --owner` now covers the three paths GitHub looks in, every workflow and `.githooks/`. Run it again.
+- **Approving without a terminal**: an earlier approval without `approved_run` fails the CI step. Approve it again in the terminal or in the approval workflow.
+- **Commit** `.larapack/realign/plan.json` and `exceptions.json` if you realign; the cache is already ignored.
+- **An `import` after adopting** may write alterations: `--dry-run` and review them before migrating.

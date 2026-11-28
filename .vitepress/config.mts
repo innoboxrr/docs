@@ -67,6 +67,8 @@ const sections: Section[] = [
             { es: ['montar-en-aplicacion', 'Montar un paquete en una aplicación'], en: ['mount-in-app', 'Mounting a package in an application'] },
             { es: ['exportar', 'Exportar a Excel'], en: ['export', 'Export to Excel'] },
             { es: ['migraciones', 'Migraciones y cambios de esquema'], en: ['migrations', 'Migrations and schema changes'] },
+            { es: ['realinear', 'Realinear un proyecto existente'], en: ['realign', 'Realigning an existing project'] },
+            { es: ['varias-consolas', 'Varias consolas a la vez'], en: ['multiple-consoles', 'Many consoles at once'] },
             { es: ['actualizar', 'Guía de actualización'], en: ['upgrade', 'Upgrade guide'] },
         ],
     },
